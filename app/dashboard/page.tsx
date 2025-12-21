@@ -1,5 +1,4 @@
 import { requireAdmin } from "@/lib/admin/auth";
-import { createClient } from "@/lib/supabase/server";
 import { DashboardMetrics } from "@/types/admin";
 import Link from "next/link";
 import {
@@ -14,86 +13,23 @@ import {
   Calendar,
 } from "lucide-react";
 
-async function getDashboardMetrics(): Promise<DashboardMetrics> {
-  const supabase = await createClient();
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  // Get leads this week
-  const { count: leadsThisWeek } = await supabase
-    .from("client_pipeline")
-    .select("*", { count: "exact", head: true })
-    .gte("created_at", startOfWeek.toISOString());
-
-  // Get leads this month
-  const { count: leadsThisMonth } = await supabase
-    .from("client_pipeline")
-    .select("*", { count: "exact", head: true })
-    .gte("created_at", startOfMonth.toISOString());
-
-  // Get quotes needing response
-  const { count: quotesNeedingResponse } = await supabase
-    .from("quotes")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "sent");
-
-  // Get orders in progress
-  const { count: ordersInProgress } = await supabase
-    .from("orders")
-    .select("*", { count: "exact", head: true })
-    .not("status", "in", '("completed","cancelled","delivered")');
-
-  // Get revenue this month
-  const { data: revenueData } = await supabase
-    .from("orders")
-    .select("total_amount")
-    .eq("status", "completed")
-    .gte("completed_at", startOfMonth.toISOString());
-
-  const revenueThisMonth =
-    revenueData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
-
-  // Get overdue follow-ups
-  const { count: overdueFollowUps } = await supabase
-    .from("client_pipeline")
-    .select("*", { count: "exact", head: true })
-    .lt("next_follow_up", now.toISOString())
-    .not("stage", "in", '("complete","lost")');
-
-  // Get total clients
-  const { count: totalClients } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true });
-
-  // Get deliveries this week
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-  const { count: deliveriesThisWeek } = await supabase
-    .from("deliveries")
-    .select("*", { count: "exact", head: true })
-    .gte("scheduled_date", startOfWeek.toISOString().split("T")[0])
-    .lte("scheduled_date", endOfWeek.toISOString().split("T")[0]);
-
+// Mock metrics for development (no database needed yet)
+function getMockMetrics(): DashboardMetrics {
   return {
-    leadsThisWeek: leadsThisWeek || 0,
-    leadsThisMonth: leadsThisMonth || 0,
-    quotesNeedingResponse: quotesNeedingResponse || 0,
-    ordersInProgress: ordersInProgress || 0,
-    revenueThisMonth,
-    overdueFollowUps: overdueFollowUps || 0,
-    totalClients: totalClients || 0,
-    deliveriesThisWeek: deliveriesThisWeek || 0,
+    leadsThisWeek: 12,
+    leadsThisMonth: 47,
+    quotesNeedingResponse: 8,
+    ordersInProgress: 15,
+    revenueThisMonth: 124500,
+    overdueFollowUps: 3,
+    totalClients: 156,
+    deliveriesThisWeek: 6,
   };
 }
 
 export default async function DashboardPage() {
   const adminUser = await requireAdmin();
-  const metrics = await getDashboardMetrics();
+  const metrics = getMockMetrics();
 
   const statCards = [
     {
@@ -229,4 +165,3 @@ export default async function DashboardPage() {
     </div>
   );
 }
-
