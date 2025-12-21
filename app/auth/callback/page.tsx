@@ -19,26 +19,32 @@ export default function AuthCallbackPage() {
       try {
         addDebug("Starting callback handler...");
         
+        // Debug: Show all localStorage keys
+        addDebug(`localStorage keys: ${Object.keys(localStorage).join(', ') || 'none'}`);
+        
+        // Check for PKCE verifier in localStorage
+        const pkceKeys = Object.keys(localStorage).filter(k => 
+          k.includes('code_verifier') || k.includes('pkce') || k.includes('supabase')
+        );
+        addDebug(`Supabase/PKCE related keys: ${pkceKeys.join(', ') || 'none'}`);
+        
         // Check URL params
         const url = new URL(window.location.href);
         const code = url.searchParams.get("code");
         const error = url.searchParams.get("error");
         const errorDescription = url.searchParams.get("error_description");
         
-        addDebug(`URL: ${url.pathname}${url.search}`);
         addDebug(`Code present: ${!!code}`);
-        addDebug(`Error: ${error || 'none'}`);
 
         if (error) {
           setStatus(`OAuth Error: ${errorDescription || error}`);
           setTimeout(() => {
             router.push(`/login?error=admin_error&message=${encodeURIComponent(errorDescription || error)}`);
-          }, 3000);
+          }, 5000);
           return;
         }
 
         if (!code) {
-          // Maybe the session is already set (implicit flow or hash)
           addDebug("No code in URL, checking for existing session...");
           const supabase = createClient();
           const { data: { session } } = await supabase.auth.getSession();
@@ -50,9 +56,6 @@ export default function AuthCallbackPage() {
           }
           
           setStatus("No authentication code received");
-          setTimeout(() => {
-            router.push("/login?error=admin_error&message=" + encodeURIComponent("No code received"));
-          }, 3000);
           return;
         }
 
@@ -68,9 +71,6 @@ export default function AuthCallbackPage() {
         if (exchangeError) {
           addDebug(`Exchange error: ${exchangeError.message}`);
           setStatus(`Error: ${exchangeError.message}`);
-          setTimeout(() => {
-            router.push(`/login?error=admin_error&message=${encodeURIComponent(exchangeError.message)}`);
-          }, 3000);
           return;
         }
 
@@ -78,7 +78,9 @@ export default function AuthCallbackPage() {
         addDebug(`User: ${data.user?.email || 'unknown'}`);
         setStatus("Success! Redirecting to dashboard...");
         
-        router.push("/dashboard");
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1000);
         
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
@@ -92,15 +94,15 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="text-center max-w-md">
+      <div className="text-center max-w-lg w-full">
         <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
         <p className="text-white text-lg mb-4">{status}</p>
         
         {debugInfo.length > 0 && (
-          <div className="mt-4 p-4 bg-gray-800 rounded-lg text-left">
+          <div className="mt-4 p-4 bg-gray-800 rounded-lg text-left overflow-auto max-h-64">
             <p className="text-gray-400 text-xs font-mono mb-2">Debug Info:</p>
             {debugInfo.map((info, i) => (
-              <p key={i} className="text-gray-500 text-xs font-mono">{info}</p>
+              <p key={i} className="text-gray-500 text-xs font-mono break-all">{info}</p>
             ))}
           </div>
         )}
@@ -108,4 +110,3 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
-
