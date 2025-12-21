@@ -10,13 +10,14 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
+  const errorMessage = searchParams.get("message");
 
   const errorMessages: Record<string, string> = {
     unauthorized: "Only @houseofclarence.uk emails can access this dashboard.",
     not_authorized: "You are not authorized to access this dashboard. Contact an admin.",
     account_disabled: "Your account has been disabled.",
     setup_required: "Database setup required. Please run the migration SQL.",
-    admin_error: "An error occurred. Please try again.",
+    admin_error: errorMessage || "An error occurred. Please try again.",
   };
 
   const handleMicrosoftLogin = async () => {
