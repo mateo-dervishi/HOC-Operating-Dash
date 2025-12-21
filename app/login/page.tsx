@@ -2,15 +2,12 @@
 
 import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter, useSearchParams } from "next/navigation";
-import { LogIn, AlertCircle } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { AlertCircle } from "lucide-react";
 
 function LoginForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
 
@@ -22,33 +19,24 @@ function LoginForm() {
     admin_error: "An error occurred. Please try again.",
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleMicrosoftLogin = async () => {
     setLoading(true);
     setError(null);
 
-    // Check email domain
-    if (!email.toLowerCase().endsWith("@houseofclarence.uk")) {
-      setError("Only @houseofclarence.uk emails can access this dashboard.");
-      setLoading(false);
-      return;
-    }
-
     const supabase = createClient();
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const { error: signInError } = await supabase.auth.signInWithOAuth({
+      provider: "azure",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: "email profile openid",
+      },
     });
 
     if (signInError) {
       setError(signInError.message);
       setLoading(false);
-      return;
     }
-
-    router.push("/dashboard");
-    router.refresh();
   };
 
   return (
@@ -73,51 +61,28 @@ function LoginForm() {
           </div>
         )}
 
-        {/* Login Form */}
-        <form onSubmit={handleLogin} className="bg-gray-800 rounded-xl p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@houseofclarence.uk"
-              required
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-            />
-          </div>
-
+        {/* Login */}
+        <div className="bg-gray-800 rounded-xl p-6">
           <button
-            type="submit"
+            onClick={handleMicrosoftLogin}
             disabled={loading}
-            className="w-full py-3 bg-white text-gray-900 font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-3 bg-white text-gray-900 font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-gray-900/20 border-t-gray-900 rounded-full animate-spin" />
             ) : (
               <>
-                <LogIn className="w-5 h-5" />
-                Sign In
+                <svg className="w-5 h-5" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+                  <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+                  <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+                  <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+                </svg>
+                Sign in with Microsoft
               </>
             )}
           </button>
-        </form>
+        </div>
 
         <p className="mt-6 text-center text-sm text-gray-500">
           Access restricted to House of Clarence team members
