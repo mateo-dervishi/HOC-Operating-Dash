@@ -11,34 +11,42 @@ export default function AuthCallbackPage() {
     const handleCallback = async () => {
       const supabase = createClient();
       
-      // Get the code from URL
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      const error = params.get("error");
-      const errorDescription = params.get("error_description");
+      // For implicit flow, the session is in the URL hash
+      // Supabase client will automatically detect and set it
+      const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error) {
-        console.error("OAuth error:", error, errorDescription);
-        router.push(`/login?error=admin_error&message=${encodeURIComponent(errorDescription || error)}`);
+        console.error("Auth error:", error.message);
+        router.push(`/login?error=admin_error&message=${encodeURIComponent(error.message)}`);
         return;
       }
 
-      if (code) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        
-        if (exchangeError) {
-          console.error("Exchange error:", exchangeError.message);
-          router.push(`/login?error=admin_error&message=${encodeURIComponent(exchangeError.message)}`);
-          return;
-        }
-
+      if (session) {
         // Success - redirect to dashboard
         router.push("/dashboard");
         return;
       }
 
-      // No code or error - something went wrong
-      router.push("/login?error=admin_error");
+      // Check URL for errors
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const errorParam = hashParams.get("error");
+      const errorDescription = hashParams.get("error_description");
+
+      if (errorParam) {
+        router.push(`/login?error=admin_error&message=${encodeURIComponent(errorDescription || errorParam)}`);
+        return;
+      }
+
+      // Try to get session one more time after a brief delay
+      // (sometimes the hash needs to be processed)
+      setTimeout(async () => {
+        const { data: { session: retrySession } } = await supabase.auth.getSession();
+        if (retrySession) {
+          router.push("/dashboard");
+        } else {
+          router.push("/login?error=admin_error");
+        }
+      }, 1000);
     };
 
     handleCallback();
@@ -53,4 +61,3 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
-
