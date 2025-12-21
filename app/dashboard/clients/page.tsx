@@ -29,11 +29,9 @@ import {
   Calendar,
   DollarSign,
   Clock,
-  ArrowRight,
 } from "lucide-react";
 import { PIPELINE_STAGES, PipelineStage, PRIORITIES } from "@/types/admin";
 
-// Mock data for development
 interface Client {
   id: string;
   name: string;
@@ -147,63 +145,60 @@ const MOCK_CLIENTS: Client[] = [
   },
 ];
 
-// Client Card Component
 function ClientCard({ client, isDragging }: { client: Client; isDragging?: boolean }) {
   const priorityColors = {
-    low: "bg-gray-100 text-gray-600",
-    normal: "bg-blue-100 text-blue-600",
-    high: "bg-orange-100 text-orange-600",
-    urgent: "bg-red-100 text-red-600",
+    low: "bg-white/10 text-white/60",
+    normal: "bg-white/10 text-white/60",
+    high: "bg-white/20 text-white",
+    urgent: "bg-white text-black",
   };
 
   return (
     <div
-      className={`bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow cursor-grab ${
-        isDragging ? "shadow-lg ring-2 ring-blue-500 opacity-90" : ""
+      className={`bg-white/5 rounded-lg border border-white/10 p-4 hover:bg-white/10 transition-colors cursor-grab ${
+        isDragging ? "ring-1 ring-white/30 opacity-90" : ""
       }`}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-gray-900 truncate">{client.name}</h4>
+          <h4 className="font-light text-white truncate">{client.name}</h4>
           {client.company && (
-            <p className="text-sm text-gray-500 truncate">{client.company}</p>
+            <p className="text-sm text-white/40 font-light truncate">{client.company}</p>
           )}
         </div>
-        <button className="p-1 hover:bg-gray-100 rounded">
-          <MoreHorizontal className="w-4 h-4 text-gray-400" />
+        <button className="p-1 hover:bg-white/10 rounded">
+          <MoreHorizontal className="w-4 h-4 text-white/40" />
         </button>
       </div>
 
       <div className="space-y-2 mb-3">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-white/40 font-light">
           <Mail className="w-3.5 h-3.5" />
           <span className="truncate">{client.email}</span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-white/40 font-light">
           <Phone className="w-3.5 h-3.5" />
           <span>{client.phone}</span>
         </div>
       </div>
 
       <div className="flex items-center gap-2 mb-3">
-        <span
-          className={`px-2 py-0.5 rounded text-xs font-medium ${priorityColors[client.priority]}`}
-        >
+        <span className={`px-2 py-0.5 rounded text-xs font-light ${priorityColors[client.priority]}`}>
           {PRIORITIES[client.priority].label}
         </span>
-        <span className="flex items-center gap-1 text-xs text-gray-500">
+        <span className="flex items-center gap-1 text-xs text-white/40 font-light">
           <DollarSign className="w-3 h-3" />
           £{client.estimatedValue.toLocaleString()}
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-100">
+      <div className="flex items-center justify-between text-xs text-white/30 font-light pt-2 border-t border-white/10">
         <span className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
           {client.lastActivity}
         </span>
         {client.nextFollowUp && (
-          <span className="flex items-center gap-1 text-orange-500">
+          <span className="flex items-center gap-1 text-white/60">
             <Calendar className="w-3 h-3" />
             {client.nextFollowUp}
           </span>
@@ -213,7 +208,6 @@ function ClientCard({ client, isDragging }: { client: Client; isDragging?: boole
   );
 }
 
-// Sortable Client Card
 function SortableClientCard({ client }: { client: Client }) {
   const {
     attributes,
@@ -236,7 +230,6 @@ function SortableClientCard({ client }: { client: Client }) {
   );
 }
 
-// Pipeline Column Component
 function PipelineColumn({
   stage,
   clients,
@@ -248,27 +241,25 @@ function PipelineColumn({
   const totalValue = clients.reduce((sum, c) => sum + c.estimatedValue, 0);
 
   return (
-    <div className="flex-shrink-0 w-80 bg-gray-50 rounded-xl">
-      {/* Column Header */}
-      <div className="p-4 border-b border-gray-200">
+    <div className="flex-shrink-0 w-80 bg-white/5 rounded-xl border border-white/10">
+      <div className="p-4 border-b border-white/10">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${stageInfo.color}`} />
-            <h3 className="font-semibold text-gray-900">{stageInfo.label}</h3>
-            <span className="bg-gray-200 text-gray-600 text-xs font-medium px-2 py-0.5 rounded-full">
+            <div className="w-2 h-2 rounded-full bg-white" />
+            <h3 className="font-light text-white">{stageInfo.label}</h3>
+            <span className="bg-white/10 text-white/60 text-xs font-light px-2 py-0.5 rounded-full">
               {clients.length}
             </span>
           </div>
-          <button className="p-1 hover:bg-gray-200 rounded">
-            <Plus className="w-4 h-4 text-gray-500" />
+          <button className="p-1 hover:bg-white/10 rounded">
+            <Plus className="w-4 h-4 text-white/40" />
           </button>
         </div>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-white/40 font-light">
           £{totalValue.toLocaleString()} total value
         </p>
       </div>
 
-      {/* Cards */}
       <div className="p-3 space-y-3 min-h-[200px] max-h-[calc(100vh-320px)] overflow-y-auto">
         <SortableContext
           items={clients.map((c) => c.id)}
@@ -279,7 +270,7 @@ function PipelineColumn({
           ))}
         </SortableContext>
         {clients.length === 0 && (
-          <div className="text-center py-8 text-gray-400">
+          <div className="text-center py-8 text-white/30 font-light">
             <p className="text-sm">No clients in this stage</p>
           </div>
         )}
@@ -302,7 +293,6 @@ export default function ClientsPage() {
     useSensor(KeyboardSensor)
   );
 
-  // Group clients by stage
   const clientsByStage = Object.keys(PIPELINE_STAGES).reduce((acc, stage) => {
     acc[stage as PipelineStage] = clients.filter(
       (c) =>
@@ -329,10 +319,8 @@ export default function ClientsPage() {
     const activeClient = clients.find((c) => c.id === active.id);
     if (!activeClient) return;
 
-    // Find which column was dropped into
     const overClient = clients.find((c) => c.id === over.id);
     if (overClient && activeClient.stage !== overClient.stage) {
-      // Move to the same stage as the client we dropped over
       setClients((prev) =>
         prev.map((c) =>
           c.id === active.id ? { ...c, stage: overClient.stage } : c
@@ -341,7 +329,6 @@ export default function ClientsPage() {
     }
   };
 
-  // Visible stages (excluding lost/complete for main view)
   const visibleStages: PipelineStage[] = [
     "new_lead",
     "selection_submitted",
@@ -354,43 +341,40 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Client Pipeline</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-light text-white">Client Pipeline</h1>
+          <p className="text-white/40 mt-1 font-light">
             Manage your clients through the sales pipeline
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+        <button className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light">
           <Plus className="w-4 h-4" />
           Add Client
         </button>
       </div>
 
-      {/* Filters & Search */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
             type="text"
             placeholder="Search clients..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900"
+            className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30"
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+        <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white/60 font-light">
           <Filter className="w-4 h-4" />
           Filters
         </button>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+        <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white/60 font-light">
           <Users className="w-4 h-4" />
           Assigned to me
         </button>
       </div>
 
-      {/* Pipeline Board */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -412,20 +396,18 @@ export default function ClientsPage() {
         </DragOverlay>
       </DndContext>
 
-      {/* Quick Stats */}
-      <div className="flex items-center gap-6 text-sm text-gray-500 pt-4 border-t border-gray-200">
+      <div className="flex items-center gap-6 text-sm text-white/40 font-light pt-4 border-t border-white/10">
         <span>
-          <strong className="text-gray-900">{clients.length}</strong> total
-          clients
+          <strong className="text-white">{clients.length}</strong> total clients
         </span>
         <span>
-          <strong className="text-gray-900">
+          <strong className="text-white">
             £{clients.reduce((sum, c) => sum + c.estimatedValue, 0).toLocaleString()}
           </strong>{" "}
           pipeline value
         </span>
         <span>
-          <strong className="text-gray-900">
+          <strong className="text-white">
             {clients.filter((c) => c.priority === "urgent" || c.priority === "high").length}
           </strong>{" "}
           high priority
@@ -434,4 +416,3 @@ export default function ClientsPage() {
     </div>
   );
 }
-

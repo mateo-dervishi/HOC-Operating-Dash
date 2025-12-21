@@ -5,131 +5,125 @@ import {
   Bell,
   Check,
   CheckCheck,
+  Filter,
+  MoreHorizontal,
   User,
-  FileText,
   Package,
+  FileText,
   Truck,
-  Clock,
   AlertCircle,
-  MessageSquare,
-  Calendar,
+  Clock,
   Trash2,
 } from "lucide-react";
 
-type NotificationType = "mention" | "assignment" | "follow_up_due" | "quote_expiring" | "order_update" | "delivery_scheduled" | "new_lead" | "system";
+type NotificationType = "lead" | "quote" | "order" | "delivery" | "reminder" | "system";
 
 interface Notification {
   id: string;
   type: NotificationType;
   title: string;
   message: string;
-  link?: string;
   read: boolean;
   createdAt: string;
+  relatedTo?: {
+    type: "client" | "order" | "quote" | "delivery";
+    id: string;
+    name: string;
+  };
+  actionUrl?: string;
 }
+
+const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
+  lead: User,
+  quote: FileText,
+  order: Package,
+  delivery: Truck,
+  reminder: Clock,
+  system: AlertCircle,
+};
 
 const MOCK_NOTIFICATIONS: Notification[] = [
   {
     id: "1",
-    type: "mention",
-    title: "You were mentioned in a note",
-    message: "Sarah mentioned you in a note about the Richardson project: 'Need @Mateo to follow up on the tile selection...'",
-    link: "/dashboard/clients/1",
+    type: "lead",
+    title: "New Lead",
+    message: "James Richardson submitted a selection request",
     read: false,
-    createdAt: "2024-01-22T10:30:00Z",
+    createdAt: "2 hours ago",
+    relatedTo: { type: "client", id: "1", name: "James Richardson" },
+    actionUrl: "/dashboard/clients",
   },
   {
     id: "2",
-    type: "follow_up_due",
-    title: "Follow-up due today",
-    message: "David Thompson - Scheduled follow-up is due today. Quote was sent 5 days ago.",
-    link: "/dashboard/clients/3",
+    type: "quote",
+    title: "Quote Viewed",
+    message: "Sarah Mitchell viewed quote Q-2024-002",
     read: false,
-    createdAt: "2024-01-22T09:00:00Z",
+    createdAt: "5 hours ago",
+    relatedTo: { type: "quote", id: "2", name: "Q-2024-002" },
+    actionUrl: "/dashboard/quotes",
   },
   {
     id: "3",
-    type: "quote_expiring",
-    title: "Quote expiring soon",
-    message: "Quote QT-2024-002 for Sarah Mitchell expires in 2 days. Total value: £18,900",
-    link: "/dashboard/quotes/2",
+    type: "reminder",
+    title: "Follow-up Reminder",
+    message: "Follow up with David Thompson about pending quote",
     read: false,
-    createdAt: "2024-01-22T08:00:00Z",
+    createdAt: "1 day ago",
+    relatedTo: { type: "client", id: "3", name: "David Thompson" },
+    actionUrl: "/dashboard/clients",
   },
   {
     id: "4",
-    type: "order_update",
-    title: "Order items received",
-    message: "3 items have been marked as received for order HOC-2024-003 (David Thompson)",
-    link: "/dashboard/orders/3",
+    type: "delivery",
+    title: "Delivery Completed",
+    message: "Order HOC-2024-004 successfully delivered to Emma Wilson",
     read: true,
-    createdAt: "2024-01-21T16:45:00Z",
+    createdAt: "1 day ago",
+    relatedTo: { type: "delivery", id: "4", name: "HOC-2024-004" },
+    actionUrl: "/dashboard/deliveries",
   },
   {
     id: "5",
-    type: "delivery_scheduled",
-    title: "Delivery scheduled for tomorrow",
-    message: "Delivery DEL-001 for James Richardson is scheduled for tomorrow, 9:00 AM - 12:00 PM",
-    link: "/dashboard/deliveries",
+    type: "order",
+    title: "Order Status Updated",
+    message: "Order HOC-2024-003 moved to Quality Check",
     read: true,
-    createdAt: "2024-01-21T14:30:00Z",
+    createdAt: "2 days ago",
+    relatedTo: { type: "order", id: "3", name: "HOC-2024-003" },
+    actionUrl: "/dashboard/orders",
   },
   {
     id: "6",
-    type: "new_lead",
-    title: "New lead assigned to you",
-    message: "Robert Taylor has been assigned to you. Property type: Residential renovation. Estimated value: £15,000",
-    link: "/dashboard/clients/7",
+    type: "system",
+    title: "Weekly Report Ready",
+    message: "Your weekly sales report is ready to view",
     read: true,
-    createdAt: "2024-01-21T11:00:00Z",
+    createdAt: "3 days ago",
   },
   {
     id: "7",
-    type: "assignment",
-    title: "New client assigned",
-    message: "Lisa Anderson has been assigned to you by Sarah. Priority: Normal",
-    link: "/dashboard/clients/6",
+    type: "quote",
+    title: "Quote Expiring",
+    message: "Quote Q-2024-001 expires in 2 days",
     read: true,
-    createdAt: "2024-01-20T15:20:00Z",
+    createdAt: "3 days ago",
+    relatedTo: { type: "quote", id: "1", name: "Q-2024-001" },
+    actionUrl: "/dashboard/quotes",
   },
   {
     id: "8",
-    type: "system",
-    title: "Weekly report ready",
-    message: "Your weekly pipeline report is ready to view. 12 new leads, 5 quotes sent, £124,500 in orders.",
-    link: "/dashboard/reports",
+    type: "delivery",
+    title: "Delivery Failed",
+    message: "Delivery for order HOC-2024-005 failed - no one home",
     read: true,
-    createdAt: "2024-01-20T09:00:00Z",
+    createdAt: "4 days ago",
+    relatedTo: { type: "delivery", id: "5", name: "HOC-2024-005" },
+    actionUrl: "/dashboard/deliveries",
   },
 ];
 
-const TYPE_CONFIG: Record<NotificationType, { icon: typeof Bell; color: string; bgColor: string }> = {
-  mention: { icon: MessageSquare, color: "text-blue-600", bgColor: "bg-blue-100" },
-  assignment: { icon: User, color: "text-purple-600", bgColor: "bg-purple-100" },
-  follow_up_due: { icon: Clock, color: "text-orange-600", bgColor: "bg-orange-100" },
-  quote_expiring: { icon: AlertCircle, color: "text-red-600", bgColor: "bg-red-100" },
-  order_update: { icon: Package, color: "text-green-600", bgColor: "bg-green-100" },
-  delivery_scheduled: { icon: Truck, color: "text-teal-600", bgColor: "bg-teal-100" },
-  new_lead: { icon: User, color: "text-indigo-600", bgColor: "bg-indigo-100" },
-  system: { icon: Bell, color: "text-gray-600", bgColor: "bg-gray-100" },
-};
-
-function formatTimeAgo(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-function NotificationCard({
+function NotificationItem({
   notification,
   onMarkRead,
   onDelete,
@@ -138,64 +132,63 @@ function NotificationCard({
   onMarkRead: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const config = TYPE_CONFIG[notification.type];
-  const Icon = config.icon;
+  const Icon = NOTIFICATION_ICONS[notification.type];
 
   return (
     <div
-      className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-        !notification.read ? "bg-blue-50/50" : ""
+      className={`flex items-start gap-4 p-4 rounded-lg border transition-colors ${
+        notification.read
+          ? "bg-white/5 border-white/5"
+          : "bg-white/10 border-white/10"
       }`}
     >
-      <div className="flex items-start gap-4">
-        <div className={`w-10 h-10 rounded-full ${config.bgColor} flex items-center justify-center flex-shrink-0`}>
-          <Icon className={`w-5 h-5 ${config.color}`} />
-        </div>
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+        notification.read ? "bg-white/5" : "bg-white/10"
+      }`}>
+        <Icon className={`w-5 h-5 ${notification.read ? "text-white/40" : "text-white"}`} />
+      </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h4 className={`font-medium ${!notification.read ? "text-gray-900" : "text-gray-700"}`}>
-                {notification.title}
-              </h4>
-              <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-            </div>
-            <span className="text-xs text-gray-400 whitespace-nowrap">
-              {formatTimeAgo(notification.createdAt)}
-            </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className={`font-light ${notification.read ? "text-white/60" : "text-white"}`}>
+              {notification.title}
+            </p>
+            <p className={`text-sm font-light mt-0.5 ${notification.read ? "text-white/40" : "text-white/60"}`}>
+              {notification.message}
+            </p>
           </div>
-
-          <div className="flex items-center gap-4 mt-3">
-            {notification.link && (
-              <a
-                href={notification.link}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                View Details →
-              </a>
-            )}
+          <div className="flex items-center gap-1 flex-shrink-0">
             {!notification.read && (
               <button
                 onClick={() => onMarkRead(notification.id)}
-                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                className="p-1.5 hover:bg-white/10 rounded transition-colors"
+                title="Mark as read"
               >
-                <Check className="w-3.5 h-3.5" />
-                Mark as read
+                <Check className="w-4 h-4 text-white/40" />
               </button>
             )}
             <button
               onClick={() => onDelete(notification.id)}
-              className="text-sm text-gray-400 hover:text-red-500 flex items-center gap-1"
+              className="p-1.5 hover:bg-white/10 rounded transition-colors"
+              title="Delete"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              Delete
+              <Trash2 className="w-4 h-4 text-white/40" />
             </button>
           </div>
         </div>
 
-        {!notification.read && (
-          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
-        )}
+        <div className="flex items-center gap-3 mt-2">
+          <span className="text-xs text-white/30 font-light">{notification.createdAt}</span>
+          {notification.relatedTo && (
+            <a
+              href={notification.actionUrl}
+              className="text-xs text-white/60 hover:text-white font-light underline underline-offset-2"
+            >
+              View {notification.relatedTo.name}
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -204,12 +197,15 @@ function NotificationCard({
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [typeFilter, setTypeFilter] = useState<NotificationType | "all">("all");
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const filteredNotifications = notifications.filter(
-    (n) => filter === "all" || !n.read
-  );
+  const filteredNotifications = notifications.filter((n) => {
+    if (filter === "unread" && n.read) return false;
+    if (typeFilter !== "all" && n.type !== typeFilter) return false;
+    return true;
+  });
 
   const handleMarkRead = (id: string) => {
     setNotifications((prev) =>
@@ -231,88 +227,91 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-gray-500 mt-1">
-            {unreadCount > 0 ? `${unreadCount} unread notifications` : "All caught up!"}
+          <h1 className="text-2xl font-light text-white">Notifications</h1>
+          <p className="text-white/40 mt-1 font-light">
+            {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white/60 font-light"
             >
               <CheckCheck className="w-4 h-4" />
-              Mark all as read
+              Mark all read
             </button>
           )}
-          {notifications.length > 0 && (
-            <button
-              onClick={handleClearAll}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear all
-            </button>
-          )}
+          <button
+            onClick={handleClearAll}
+            className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white/60 font-light"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear all
+          </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setFilter("all")}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-            filter === "all"
-              ? "bg-gray-900 text-white"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+          <button
+            onClick={() => setFilter("all")}
+            className={`px-4 py-1.5 rounded-md text-sm font-light transition-colors ${
+              filter === "all"
+                ? "bg-white text-black"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setFilter("unread")}
+            className={`px-4 py-1.5 rounded-md text-sm font-light transition-colors ${
+              filter === "unread"
+                ? "bg-white text-black"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            Unread ({unreadCount})
+          </button>
+        </div>
+
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as NotificationType | "all")}
+          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 font-light focus:outline-none focus:ring-1 focus:ring-white/30"
         >
-          All
-        </button>
-        <button
-          onClick={() => setFilter("unread")}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
-            filter === "unread"
-              ? "bg-gray-900 text-white"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Unread
-          {unreadCount > 0 && (
-            <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-              filter === "unread" ? "bg-white/20" : "bg-blue-500 text-white"
-            }`}>
-              {unreadCount}
-            </span>
-          )}
-        </button>
+          <option value="all">All types</option>
+          <option value="lead">Leads</option>
+          <option value="quote">Quotes</option>
+          <option value="order">Orders</option>
+          <option value="delivery">Deliveries</option>
+          <option value="reminder">Reminders</option>
+          <option value="system">System</option>
+        </select>
       </div>
 
       {/* Notifications List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {filteredNotifications.length > 0 ? (
-          filteredNotifications.map((notification) => (
-            <NotificationCard
-              key={notification.id}
-              notification={notification}
-              onMarkRead={handleMarkRead}
-              onDelete={handleDelete}
-            />
-          ))
-        ) : (
-          <div className="text-center py-12">
-            <Bell className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">
-              {filter === "unread" ? "No unread notifications" : "No notifications yet"}
-            </p>
-          </div>
-        )}
+      <div className="space-y-3">
+        {filteredNotifications.map((notification) => (
+          <NotificationItem
+            key={notification.id}
+            notification={notification}
+            onMarkRead={handleMarkRead}
+            onDelete={handleDelete}
+          />
+        ))}
       </div>
+
+      {filteredNotifications.length === 0 && (
+        <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">
+          <Bell className="w-12 h-12 mx-auto mb-4 text-white/20" />
+          <p className="text-white/40 font-light">No notifications</p>
+        </div>
+      )}
     </div>
   );
 }
-

@@ -5,217 +5,230 @@ import {
   Truck,
   Plus,
   Search,
+  Filter,
+  MoreHorizontal,
   Calendar,
+  Clock,
   MapPin,
   Phone,
   User,
-  Package,
-  Clock,
   CheckCircle,
-  XCircle,
-  AlertTriangle,
-  ChevronRight,
-  ChevronLeft,
+  Package,
 } from "lucide-react";
 
-type DeliveryStatus = "scheduled" | "confirmed" | "out_for_delivery" | "delivered" | "failed" | "rescheduled";
+type DeliveryStatus = "scheduled" | "in_transit" | "delivered" | "failed" | "rescheduled";
 
 interface Delivery {
   id: string;
-  deliveryNumber: string;
   orderNumber: string;
   clientName: string;
+  clientPhone: string;
   address: string;
-  contactPhone: string;
-  scheduledDate: string;
-  timeWindow: string;
+  postcode: string;
   status: DeliveryStatus;
-  itemCount: number;
+  scheduledDate: string;
+  scheduledTime: string;
+  driver?: string;
+  items: string[];
   notes?: string;
+  completedAt?: string;
 }
+
+const DELIVERY_STATUSES: Record<DeliveryStatus, { label: string; color: string }> = {
+  scheduled: { label: "Scheduled", color: "bg-white/10 text-white" },
+  in_transit: { label: "In Transit", color: "bg-white/20 text-white" },
+  delivered: { label: "Delivered", color: "bg-white text-black" },
+  failed: { label: "Failed", color: "bg-white/10 text-white/60" },
+  rescheduled: { label: "Rescheduled", color: "bg-white/10 text-white/60" },
+};
 
 const MOCK_DELIVERIES: Delivery[] = [
   {
     id: "1",
-    deliveryNumber: "DEL-001",
     orderNumber: "HOC-2024-001",
     clientName: "James Richardson",
-    address: "42 Kensington Gardens, London W8 4PX",
-    contactPhone: "020 7123 4567",
-    scheduledDate: "2024-01-25",
-    timeWindow: "9:00 AM - 12:00 PM",
-    status: "confirmed",
-    itemCount: 8,
-    notes: "Ring doorbell twice. Building has service entrance.",
+    clientPhone: "020 7123 4567",
+    address: "14 Kensington Gardens",
+    postcode: "W8 4PX",
+    status: "scheduled",
+    scheduledDate: "2024-12-28",
+    scheduledTime: "09:00 - 12:00",
+    driver: "Tom Wilson",
+    items: ["Clarence Sofa", "Monarch Armchair x2", "Windsor Coffee Table"],
   },
   {
     id: "2",
-    deliveryNumber: "DEL-002",
     orderNumber: "HOC-2024-002",
     clientName: "Sarah Mitchell",
-    address: "15 Chelsea Manor, London SW3 5RZ",
-    contactPhone: "020 8234 5678",
-    scheduledDate: "2024-01-25",
-    timeWindow: "2:00 PM - 5:00 PM",
+    clientPhone: "020 8234 5678",
+    address: "8 Chelsea Manor Street",
+    postcode: "SW3 5RH",
     status: "scheduled",
-    itemCount: 5,
+    scheduledDate: "2024-12-28",
+    scheduledTime: "14:00 - 17:00",
+    driver: "Tom Wilson",
+    items: ["Kensington Dining Table", "Dining Chairs x8"],
   },
   {
     id: "3",
-    deliveryNumber: "DEL-003",
     orderNumber: "HOC-2024-003",
     clientName: "David Thompson",
-    address: "78 Mayfair Place, London W1K 6JP",
-    contactPhone: "07700 900123",
-    scheduledDate: "2024-01-26",
-    timeWindow: "10:00 AM - 1:00 PM",
-    status: "scheduled",
-    itemCount: 12,
-    notes: "Large items - requires two person lift",
+    clientPhone: "07700 900123",
+    address: "23 Mayfair Lane",
+    postcode: "W1K 2AB",
+    status: "in_transit",
+    scheduledDate: "2024-12-21",
+    scheduledTime: "10:00 - 13:00",
+    driver: "Mike Johnson",
+    items: ["Master Bed Frame", "Bedside Tables x2"],
+    notes: "Access via rear entrance, call on arrival",
   },
   {
     id: "4",
-    deliveryNumber: "DEL-004",
     orderNumber: "HOC-2024-004",
     clientName: "Emma Wilson",
-    address: "23 Notting Hill Gate, London W11 3JQ",
-    contactPhone: "07700 900456",
-    scheduledDate: "2024-01-24",
-    timeWindow: "9:00 AM - 12:00 PM",
+    clientPhone: "07700 900456",
+    address: "45 Notting Hill Gate",
+    postcode: "W11 3JQ",
     status: "delivered",
-    itemCount: 3,
+    scheduledDate: "2024-12-20",
+    scheduledTime: "09:00 - 12:00",
+    driver: "Tom Wilson",
+    items: ["Hampton Bookcase x2"],
+    completedAt: "2024-12-20T11:32:00",
   },
   {
     id: "5",
-    deliveryNumber: "DEL-005",
     orderNumber: "HOC-2024-005",
     clientName: "Michael Brown",
-    address: "56 Belgravia Square, London SW1X 8PH",
-    contactPhone: "020 7456 7890",
-    scheduledDate: "2024-01-27",
-    timeWindow: "1:00 PM - 4:00 PM",
-    status: "scheduled",
-    itemCount: 6,
+    clientPhone: "020 7456 7890",
+    address: "67 Belgravia Square",
+    postcode: "SW1X 8NH",
+    status: "failed",
+    scheduledDate: "2024-12-19",
+    scheduledTime: "14:00 - 17:00",
+    driver: "Mike Johnson",
+    items: ["Clarence Sofa x2", "Accent Pillows"],
+    notes: "No one home - attempted delivery at 14:45",
+  },
+  {
+    id: "6",
+    orderNumber: "HOC-2024-006",
+    clientName: "Lisa Anderson",
+    clientPhone: "07800 123456",
+    address: "12 Richmond Terrace",
+    postcode: "TW10 6RN",
+    status: "rescheduled",
+    scheduledDate: "2024-12-30",
+    scheduledTime: "10:00 - 13:00",
+    items: ["Executive Desk", "Office Chair"],
+    notes: "Rescheduled from Dec 22 - client request",
   },
 ];
 
-const STATUS_CONFIG: Record<DeliveryStatus, { label: string; color: string; bgColor: string }> = {
-  scheduled: { label: "Scheduled", color: "text-blue-600", bgColor: "bg-blue-100" },
-  confirmed: { label: "Confirmed", color: "text-green-600", bgColor: "bg-green-100" },
-  out_for_delivery: { label: "Out for Delivery", color: "text-purple-600", bgColor: "bg-purple-100" },
-  delivered: { label: "Delivered", color: "text-emerald-600", bgColor: "bg-emerald-100" },
-  failed: { label: "Failed", color: "text-red-600", bgColor: "bg-red-100" },
-  rescheduled: { label: "Rescheduled", color: "text-orange-600", bgColor: "bg-orange-100" },
-};
-
 function DeliveryCard({ delivery }: { delivery: Delivery }) {
-  const config = STATUS_CONFIG[delivery.status];
+  const statusInfo = DELIVERY_STATUSES[delivery.status];
   const isToday = delivery.scheduledDate === new Date().toISOString().split("T")[0];
-  const isPast = new Date(delivery.scheduledDate) < new Date() && delivery.status !== "delivered";
+  const isPast = new Date(delivery.scheduledDate) < new Date();
 
   return (
-    <div className={`bg-white rounded-lg border p-5 hover:shadow-md transition-shadow ${
-      isToday ? "border-blue-300 ring-1 ring-blue-100" : "border-gray-200"
-    }`}>
+    <div className="bg-white/5 rounded-xl border border-white/10 p-5 hover:bg-white/10 transition-colors">
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-mono text-sm font-medium text-gray-900">
-              {delivery.deliveryNumber}
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-light ${statusInfo.color}`}>
+              {statusInfo.label}
             </span>
-            <span className="text-xs text-gray-400">•</span>
-            <span className="text-xs text-gray-500">{delivery.orderNumber}</span>
+            {isToday && delivery.status !== "delivered" && (
+              <span className="px-2 py-0.5 bg-white text-black rounded-full text-xs font-light">
+                Today
+              </span>
+            )}
           </div>
-          <h3 className="font-medium text-gray-900">{delivery.clientName}</h3>
+          <h3 className="font-light text-white">{delivery.orderNumber}</h3>
         </div>
-        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${config.bgColor} ${config.color}`}>
-          {config.label}
-        </span>
+        <button className="p-1.5 hover:bg-white/10 rounded transition-colors">
+          <MoreHorizontal className="w-4 h-4 text-white/40" />
+        </button>
       </div>
 
-      <div className="space-y-2 mb-4">
-        <div className="flex items-start gap-2 text-sm text-gray-600">
-          <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-          <span>{delivery.address}</span>
+      <div className="space-y-3 mb-4">
+        <div className="flex items-center gap-3 text-sm">
+          <User className="w-4 h-4 text-white/40 flex-shrink-0" />
+          <span className="font-light text-white">{delivery.clientName}</span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Phone className="w-4 h-4 text-gray-400" />
-          <span>{delivery.contactPhone}</span>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4 text-sm mb-4">
-        <div className={`flex items-center gap-2 ${isPast && delivery.status !== "delivered" ? "text-red-500" : "text-gray-600"}`}>
-          <Calendar className="w-4 h-4" />
-          <span className="font-medium">
-            {isToday ? "Today" : new Date(delivery.scheduledDate).toLocaleDateString("en-GB", {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-            })}
+        <div className="flex items-start gap-3 text-sm">
+          <MapPin className="w-4 h-4 text-white/40 flex-shrink-0 mt-0.5" />
+          <span className="font-light text-white/60">
+            {delivery.address}, {delivery.postcode}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-gray-600">
-          <Clock className="w-4 h-4" />
-          <span>{delivery.timeWindow}</span>
+        <div className="flex items-center gap-3 text-sm">
+          <Phone className="w-4 h-4 text-white/40 flex-shrink-0" />
+          <span className="font-light text-white/60">{delivery.clientPhone}</span>
+        </div>
+        <div className="flex items-center gap-3 text-sm">
+          <Calendar className="w-4 h-4 text-white/40 flex-shrink-0" />
+          <span className="font-light text-white/60">
+            {delivery.scheduledDate} • {delivery.scheduledTime}
+          </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-        <Package className="w-4 h-4" />
-        <span>{delivery.itemCount} items</span>
+      <div className="border-t border-white/10 pt-4">
+        <p className="text-xs text-white/40 mb-2 font-light">Items ({delivery.items.length})</p>
+        <div className="flex flex-wrap gap-1">
+          {delivery.items.map((item, idx) => (
+            <span
+              key={idx}
+              className="px-2 py-0.5 bg-white/5 rounded text-xs text-white/60 font-light"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
       </div>
 
-      {delivery.notes && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 mb-4">
-          <p className="font-medium mb-1">Delivery Notes:</p>
-          <p>{delivery.notes}</p>
+      {delivery.driver && (
+        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/10 text-sm">
+          <Truck className="w-4 h-4 text-white/40" />
+          <span className="text-white/60 font-light">{delivery.driver}</span>
         </div>
       )}
 
-      <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-        {delivery.status === "scheduled" && (
-          <button className="flex-1 px-3 py-2 text-sm bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors">
-            Confirm
-          </button>
-        )}
-        {delivery.status === "confirmed" && (
-          <button className="flex-1 px-3 py-2 text-sm bg-purple-600 text-white hover:bg-purple-700 rounded-lg transition-colors">
-            Mark Out for Delivery
-          </button>
-        )}
-        {delivery.status === "out_for_delivery" && (
-          <>
-            <button className="flex-1 px-3 py-2 text-sm bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors">
-              Mark Delivered
-            </button>
-            <button className="px-3 py-2 text-sm border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-              Failed
-            </button>
-          </>
-        )}
-        {(delivery.status === "delivered" || delivery.status === "failed") && (
-          <button className="flex-1 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-            View Details
-          </button>
-        )}
-      </div>
+      {delivery.notes && (
+        <div className="mt-4 p-3 bg-white/5 rounded-lg">
+          <p className="text-xs text-white/60 font-light">{delivery.notes}</p>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function DeliveriesPage() {
   const [deliveries] = useState<Delivery[]>(MOCK_DELIVERIES);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DeliveryStatus | "all">("all");
+  const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
 
-  // Get unique dates with deliveries
-  const deliveryDates = Array.from(new Set(deliveries.map((d) => d.scheduledDate))).sort();
+  const filteredDeliveries = deliveries.filter((delivery) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      delivery.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      delivery.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      delivery.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      delivery.postcode.toLowerCase().includes(searchQuery.toLowerCase());
 
-  // Filter deliveries for selected date or show all
-  const filteredDeliveries = deliveries.filter(
-    (d) => viewMode === "calendar" ? d.scheduledDate === selectedDate : true
-  );
+    const matchesStatus =
+      statusFilter === "all" || delivery.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const statusCounts = Object.keys(DELIVERY_STATUSES).reduce((acc, status) => {
+    acc[status as DeliveryStatus] = deliveries.filter((d) => d.status === status).length;
+    return acc;
+  }, {} as Record<DeliveryStatus, number>);
 
   const todayDeliveries = deliveries.filter(
     (d) => d.scheduledDate === new Date().toISOString().split("T")[0]
@@ -223,116 +236,65 @@ export default function DeliveriesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Deliveries</h1>
-          <p className="text-gray-500 mt-1">
-            Schedule and track all deliveries
+          <h1 className="text-2xl font-light text-white">Deliveries</h1>
+          <p className="text-white/40 mt-1 font-light">
+            Schedule and track deliveries • {todayDeliveries.length} today
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+        <button className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light">
           <Plus className="w-4 h-4" />
           Schedule Delivery
         </button>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-blue-600 mb-1">
-            <Calendar className="w-4 h-4" />
-            <span className="text-sm font-medium">Today</span>
-          </div>
-          <p className="text-2xl font-semibold text-gray-900">
-            {todayDeliveries.length}
-          </p>
-          <p className="text-sm text-gray-500">deliveries</p>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-green-600 mb-1">
-            <CheckCircle className="w-4 h-4" />
-            <span className="text-sm font-medium">Confirmed</span>
-          </div>
-          <p className="text-2xl font-semibold text-gray-900">
-            {deliveries.filter((d) => d.status === "confirmed").length}
-          </p>
-          <p className="text-sm text-gray-500">ready to go</p>
-        </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-purple-600 mb-1">
-            <Truck className="w-4 h-4" />
-            <span className="text-sm font-medium">In Transit</span>
-          </div>
-          <p className="text-2xl font-semibold text-gray-900">
-            {deliveries.filter((d) => d.status === "out_for_delivery").length}
-          </p>
-          <p className="text-sm text-gray-500">on the way</p>
-        </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-orange-600 mb-1">
-            <AlertTriangle className="w-4 h-4" />
-            <span className="text-sm font-medium">Needs Action</span>
-          </div>
-          <p className="text-2xl font-semibold text-gray-900">
-            {deliveries.filter((d) => d.status === "scheduled").length}
-          </p>
-          <p className="text-sm text-gray-500">to confirm</p>
-        </div>
+      {/* Status Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {(Object.keys(DELIVERY_STATUSES) as DeliveryStatus[]).map((status) => {
+          const info = DELIVERY_STATUSES[status];
+          const isActive = statusFilter === status;
+          return (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(isActive ? "all" : status)}
+              className={`p-3 rounded-lg border transition-colors text-left ${
+                isActive
+                  ? "bg-white text-black border-white"
+                  : "bg-white/5 border-white/10 hover:bg-white/10"
+              }`}
+            >
+              <p className={`text-lg font-light ${isActive ? "text-black" : "text-white"}`}>
+                {statusCounts[status]}
+              </p>
+              <p className={`text-xs font-light ${isActive ? "text-black/60" : "text-white/40"}`}>
+                {info.label}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
-      {/* View Toggle */}
+      {/* Search */}
       <div className="flex items-center gap-4">
-        <div className="flex items-center bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setViewMode("list")}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              viewMode === "list" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"
-            }`}
-          >
-            All Deliveries
-          </button>
-          <button
-            onClick={() => setViewMode("calendar")}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              viewMode === "calendar" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"
-            }`}
-          >
-            By Date
-          </button>
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+          <input
+            type="text"
+            placeholder="Search deliveries..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30"
+          />
         </div>
-
-        {viewMode === "calendar" && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                const date = new Date(selectedDate);
-                date.setDate(date.getDate() - 1);
-                setSelectedDate(date.toISOString().split("T")[0]);
-              }}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="font-medium text-gray-900 min-w-[150px] text-center">
-              {new Date(selectedDate).toLocaleDateString("en-GB", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })}
-            </span>
-            <button
-              onClick={() => {
-                const date = new Date(selectedDate);
-                date.setDate(date.getDate() + 1);
-                setSelectedDate(date.toISOString().split("T")[0]);
-              }}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white/60 font-light">
+          <Filter className="w-4 h-4" />
+          Filters
+        </button>
+        <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white/60 font-light">
+          <Calendar className="w-4 h-4" />
+          Calendar View
+        </button>
       </div>
 
       {/* Deliveries Grid */}
@@ -343,12 +305,27 @@ export default function DeliveriesPage() {
       </div>
 
       {filteredDeliveries.length === 0 && (
-        <div className="text-center py-12">
-          <Truck className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">No deliveries scheduled for this date</p>
+        <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">
+          <Truck className="w-12 h-12 mx-auto mb-4 text-white/20" />
+          <p className="text-white/40 font-light">No deliveries found</p>
         </div>
       )}
+
+      {/* Summary */}
+      <div className="flex items-center gap-6 text-sm text-white/40 font-light pt-4 border-t border-white/10">
+        <span>
+          <strong className="text-white">{filteredDeliveries.length}</strong> deliveries shown
+        </span>
+        <span>
+          <strong className="text-white">{todayDeliveries.length}</strong> scheduled today
+        </span>
+        <span>
+          <strong className="text-white">
+            {deliveries.filter((d) => d.status === "delivered").length}
+          </strong>{" "}
+          completed this week
+        </span>
+      </div>
     </div>
   );
 }
-

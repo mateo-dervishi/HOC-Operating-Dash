@@ -13,7 +13,6 @@ import {
   Calendar,
 } from "lucide-react";
 
-// Mock metrics for development (no database needed yet)
 function getMockMetrics(): DashboardMetrics {
   return {
     leadsThisWeek: 12,
@@ -37,7 +36,6 @@ export default async function DashboardPage() {
       value: metrics.leadsThisMonth,
       subtitle: `${metrics.leadsThisWeek} this week`,
       icon: Users,
-      color: "bg-blue-500",
       href: "/dashboard/clients?stage=new_lead",
     },
     {
@@ -45,7 +43,6 @@ export default async function DashboardPage() {
       value: metrics.quotesNeedingResponse,
       subtitle: "Awaiting response",
       icon: FileText,
-      color: "bg-amber-500",
       href: "/dashboard/quotes?status=sent",
     },
     {
@@ -53,7 +50,6 @@ export default async function DashboardPage() {
       value: metrics.ordersInProgress,
       subtitle: "In progress",
       icon: Package,
-      color: "bg-purple-500",
       href: "/dashboard/orders?status=in_progress",
     },
     {
@@ -61,7 +57,6 @@ export default async function DashboardPage() {
       value: `£${metrics.revenueThisMonth.toLocaleString("en-GB")}`,
       subtitle: new Date().toLocaleDateString("en-GB", { month: "long" }),
       icon: TrendingUp,
-      color: "bg-green-500",
       href: "/dashboard/orders?status=completed",
     },
   ];
@@ -70,30 +65,30 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-1">
+        <h1 className="text-2xl font-light text-white">Dashboard</h1>
+        <p className="text-white/40 mt-1 font-light">
           Welcome back, {adminUser.name.split(" ")[0]}
         </p>
       </div>
 
       {/* Alerts */}
       {metrics.overdueFollowUps > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-4">
-          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="w-5 h-5 text-red-600" />
+        <div className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center gap-4">
+          <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1">
-            <p className="font-medium text-red-800">
+            <p className="font-light text-white">
               You have {metrics.overdueFollowUps} overdue follow-up
               {metrics.overdueFollowUps !== 1 ? "s" : ""}
             </p>
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-white/40 font-light">
               These clients are waiting to hear from you
             </p>
           </div>
           <Link
             href="/dashboard/clients?filter=overdue"
-            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+            className="px-4 py-2 bg-white text-black text-sm font-light rounded-lg hover:bg-white/90 transition-colors"
           >
             View Now
           </Link>
@@ -106,58 +101,56 @@ export default async function DashboardPage() {
           <Link
             key={stat.title}
             href={stat.href}
-            className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all group"
+            className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all group"
           >
             <div className="flex items-start justify-between mb-4">
-              <div
-                className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center`}
-              >
+              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
                 <stat.icon className="w-6 h-6 text-white" />
               </div>
-              <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ArrowRight className="w-4 h-4 text-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <p className="text-3xl font-semibold text-gray-900">{stat.value}</p>
-            <p className="text-sm text-gray-500 mt-1">{stat.title}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{stat.subtitle}</p>
+            <p className="text-3xl font-light text-white">{stat.value}</p>
+            <p className="text-sm text-white/60 mt-1 font-light">{stat.title}</p>
+            <p className="text-xs text-white/40 mt-0.5 font-light">{stat.subtitle}</p>
           </Link>
         ))}
       </div>
 
       {/* Quick Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg p-4 border border-gray-100">
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <div className="flex items-center gap-3">
-            <Users className="w-5 h-5 text-gray-400" />
+            <Users className="w-5 h-5 text-white/40" />
             <div>
-              <p className="text-lg font-semibold">{metrics.totalClients}</p>
-              <p className="text-xs text-gray-500">Total Clients</p>
+              <p className="text-lg font-light text-white">{metrics.totalClients}</p>
+              <p className="text-xs text-white/40 font-light">Total Clients</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg p-4 border border-gray-100">
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <div className="flex items-center gap-3">
-            <Truck className="w-5 h-5 text-gray-400" />
+            <Truck className="w-5 h-5 text-white/40" />
             <div>
-              <p className="text-lg font-semibold">{metrics.deliveriesThisWeek}</p>
-              <p className="text-xs text-gray-500">Deliveries This Week</p>
+              <p className="text-lg font-light text-white">{metrics.deliveriesThisWeek}</p>
+              <p className="text-xs text-white/40 font-light">Deliveries This Week</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg p-4 border border-gray-100">
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <div className="flex items-center gap-3">
-            <Clock className="w-5 h-5 text-gray-400" />
+            <Clock className="w-5 h-5 text-white/40" />
             <div>
-              <p className="text-lg font-semibold">{metrics.overdueFollowUps}</p>
-              <p className="text-xs text-gray-500">Overdue Follow-ups</p>
+              <p className="text-lg font-light text-white">{metrics.overdueFollowUps}</p>
+              <p className="text-xs text-white/40 font-light">Overdue Follow-ups</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg p-4 border border-gray-100">
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <div className="flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-gray-400" />
+            <Calendar className="w-5 h-5 text-white/40" />
             <div>
-              <p className="text-lg font-semibold">{metrics.leadsThisWeek}</p>
-              <p className="text-xs text-gray-500">Leads This Week</p>
+              <p className="text-lg font-light text-white">{metrics.leadsThisWeek}</p>
+              <p className="text-xs text-white/40 font-light">Leads This Week</p>
             </div>
           </div>
         </div>

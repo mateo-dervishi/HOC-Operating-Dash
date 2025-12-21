@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { AdminUser } from "@/types/admin";
-import { AdminSection, SECTION_PERMISSIONS } from "@/lib/admin/permissions";
 
 interface SidebarProps {
   adminUser: AdminUser;
@@ -30,39 +29,33 @@ interface NavItem {
   name: string;
   href: string;
   icon: typeof LayoutDashboard;
-  section: AdminSection;
 }
 
 const navigation: NavItem[] = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "dashboard" },
-  { name: "Clients", href: "/dashboard/clients", icon: Users, section: "clients" },
-  { name: "Quotes", href: "/dashboard/quotes", icon: FileText, section: "quotes" },
-  { name: "Orders", href: "/dashboard/orders", icon: Package, section: "orders" },
-  { name: "Deliveries", href: "/dashboard/deliveries", icon: Truck, section: "deliveries" },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Clients", href: "/dashboard/clients", icon: Users },
+  { name: "Quotes", href: "/dashboard/quotes", icon: FileText },
+  { name: "Orders", href: "/dashboard/orders", icon: Package },
+  { name: "Deliveries", href: "/dashboard/deliveries", icon: Truck },
 ];
 
 const secondaryNavigation: NavItem[] = [
-  { name: "Team", href: "/dashboard/team", icon: UsersRound, section: "team" },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, section: "settings" },
+  { name: "Team", href: "/dashboard/team", icon: UsersRound },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
-
-function canAccess(role: AdminUser["role"], section: AdminSection): boolean {
-  const allowedRoles = SECTION_PERMISSIONS[section] as readonly string[];
-  return allowedRoles.includes(role);
-}
 
 function getRoleBadgeColor(role: AdminUser["role"]): string {
   switch (role) {
     case "admin":
-      return "bg-red-500/20 text-red-300";
+      return "bg-white/10 text-white/90";
     case "manager":
-      return "bg-blue-500/20 text-blue-300";
+      return "bg-white/10 text-white/90";
     case "sales":
-      return "bg-green-500/20 text-green-300";
+      return "bg-white/10 text-white/90";
     case "operations":
-      return "bg-orange-500/20 text-orange-300";
+      return "bg-white/10 text-white/90";
     default:
-      return "bg-white/20 text-white/70";
+      return "bg-white/10 text-white/70";
   }
 }
 
@@ -70,14 +63,6 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  // Filter navigation based on user role
-  const visibleNavigation = navigation.filter((item) =>
-    canAccess(adminUser.role, item.section)
-  );
-  const visibleSecondaryNav = secondaryNavigation.filter((item) =>
-    canAccess(adminUser.role, item.section)
-  );
 
   const isActive = (href: string) => {
     if (href === "/dashboard") {
@@ -92,7 +77,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
       <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="w-8 h-8 bg-white flex items-center justify-center">
-            <span className="text-gray-900 text-sm font-bold">HC</span>
+            <span className="text-black text-sm font-medium">HC</span>
           </div>
           <AnimatePresence>
             {!isCollapsed && (
@@ -100,7 +85,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: "auto" }}
                 exit={{ opacity: 0, width: 0 }}
-                className="text-sm font-semibold tracking-wider text-white overflow-hidden whitespace-nowrap"
+                className="text-sm font-light tracking-[0.3em] text-white overflow-hidden whitespace-nowrap"
               >
                 OPERATIONS
               </motion.span>
@@ -109,7 +94,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
         </Link>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden lg:flex items-center justify-center w-8 h-8 text-white/60 hover:text-white hover:bg-white/10 rounded transition-colors"
+          className="hidden lg:flex items-center justify-center w-8 h-8 text-white/40 hover:text-white hover:bg-white/5 rounded transition-colors"
         >
           <ChevronLeft
             className={`w-4 h-4 transition-transform ${isCollapsed ? "rotate-180" : ""}`}
@@ -120,7 +105,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
       {/* Search */}
       <div className="p-4">
         <button
-          className={`flex items-center gap-3 w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white rounded-lg transition-colors ${
+          className={`flex items-center gap-3 w-full bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/60 rounded-lg transition-colors ${
             isCollapsed ? "justify-center p-3" : "px-4 py-3"
           }`}
         >
@@ -131,7 +116,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="text-sm"
+                className="text-sm font-light"
               >
                 Search...
               </motion.span>
@@ -142,16 +127,16 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-2 space-y-1">
-        {visibleNavigation.map((item) => {
+        {navigation.map((item) => {
           const active = isActive(item.href);
           return (
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-light transition-all ${
                 active
-                  ? "bg-white text-gray-900 font-medium"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
+                  ? "bg-white text-black"
+                  : "text-white/60 hover:text-white hover:bg-white/5"
               } ${isCollapsed ? "justify-center" : ""}`}
             >
               <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -177,14 +162,14 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
         {/* Notifications */}
         <Link
           href="/dashboard/notifications"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-white/70 hover:text-white hover:bg-white/10 ${
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-light transition-all text-white/60 hover:text-white hover:bg-white/5 ${
             isCollapsed ? "justify-center" : ""
           }`}
         >
           <div className="relative flex-shrink-0">
             <Bell className="w-5 h-5" />
             {unreadNotifications > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-medium rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-black text-[10px] font-medium rounded-full flex items-center justify-center">
                 {unreadNotifications > 9 ? "9+" : unreadNotifications}
               </span>
             )}
@@ -203,11 +188,11 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
           </AnimatePresence>
         </Link>
 
-        {visibleSecondaryNav.map((item) => (
+        {secondaryNavigation.map((item) => (
           <Link
             key={item.name}
             href={item.href}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-white/70 hover:text-white hover:bg-white/10 ${
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-light transition-all text-white/60 hover:text-white hover:bg-white/5 ${
               isCollapsed ? "justify-center" : ""
             }`}
           >
@@ -231,7 +216,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
       {/* User Profile */}
       <div className="p-4 border-t border-white/10">
         <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
-          <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white text-sm font-light flex-shrink-0">
             {adminUser.name
               .split(" ")
               .map((n) => n[0])
@@ -247,11 +232,11 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
                 exit={{ opacity: 0 }}
                 className="flex-1 min-w-0 overflow-hidden"
               >
-                <p className="text-sm font-medium text-white truncate">
+                <p className="text-sm font-light text-white truncate">
                   {adminUser.name}
                 </p>
                 <span
-                  className={`inline-block px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded ${getRoleBadgeColor(
+                  className={`inline-block px-2 py-0.5 text-[10px] font-light uppercase tracking-wider rounded ${getRoleBadgeColor(
                     adminUser.role
                   )}`}
                 >
@@ -267,15 +252,12 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <form action="/auth/signout" method="post">
-                  <button
-                    type="submit"
-                    className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded transition-colors"
-                    title="Sign out"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </form>
+                <button
+                  className="p-2 text-white/30 hover:text-white hover:bg-white/5 rounded transition-colors"
+                  title="Sign out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -289,7 +271,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-gray-900 text-white rounded-lg shadow-lg"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-black border border-white/10 text-white rounded-lg"
       >
         <Menu className="w-5 h-5" />
       </button>
@@ -301,7 +283,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="lg:hidden fixed inset-0 bg-black/50 z-40"
+            className="lg:hidden fixed inset-0 bg-black/80 z-40"
             onClick={() => setIsMobileOpen(false)}
           />
         )}
@@ -315,7 +297,7 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
             animate={{ x: 0 }}
             exit={{ x: -280 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="lg:hidden fixed left-0 top-0 bottom-0 w-[280px] bg-gray-900 flex flex-col z-50"
+            className="lg:hidden fixed left-0 top-0 bottom-0 w-[280px] bg-black border-r border-white/10 flex flex-col z-50"
           >
             {sidebarContent}
           </motion.aside>
@@ -326,11 +308,10 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
       <motion.aside
         animate={{ width: isCollapsed ? 80 : 280 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="hidden lg:flex fixed left-0 top-0 bottom-0 bg-gray-900 flex-col z-40"
+        className="hidden lg:flex fixed left-0 top-0 bottom-0 bg-black border-r border-white/10 flex-col z-40"
       >
         {sidebarContent}
       </motion.aside>
     </>
   );
 }
-

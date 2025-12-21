@@ -9,18 +9,29 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          black: "#1a1a1a",
-          DEFAULT: "#1a1a1a",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          gold: "#C9A96E",
-          DEFAULT: "#C9A96E",
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
       },
       fontFamily: {
-        display: ["var(--font-display)", "serif"],
-        sans: ["var(--font-sans)", "sans-serif"],
+        sans: ["var(--font-inter)", "Inter", "sans-serif"],
+      },
+      fontWeight: {
+        light: "300",
       },
     },
   },
@@ -28,4 +39,3 @@ const config: Config = {
 };
 
 export default config;
-
