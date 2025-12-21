@@ -6,87 +6,69 @@ import { useRouter } from "next/navigation";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [status, setStatus] = useState("Processing...");
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [status, setStatus] = useState("Processing authentication...");
 
   useEffect(() => {
     const handleCallback = async () => {
-      const addDebug = (msg: string) => {
-        console.log(msg);
-        setDebugInfo(prev => [...prev, msg]);
-      };
+      const supabase = createClient();
 
-      try {
-        addDebug("Starting callback handler...");
-        
-        // Debug: Show all localStorage keys
-        addDebug(`localStorage keys: ${Object.keys(localStorage).join(', ') || 'none'}`);
-        
-        // Check for PKCE verifier in localStorage
-        const pkceKeys = Object.keys(localStorage).filter(k => 
-          k.includes('code_verifier') || k.includes('pkce') || k.includes('supabase')
-        );
-        addDebug(`Supabase/PKCE related keys: ${pkceKeys.join(', ') || 'none'}`);
-        
-        // Check URL params
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get("code");
-        const error = url.searchParams.get("error");
-        const errorDescription = url.searchParams.get("error_description");
-        
-        addDebug(`Code present: ${!!code}`);
+      // For implicit flow, tokens are in the URL hash
+      // The Supabase client will automatically detect and process them
+      // when we call getSession or any auth method
 
-        if (error) {
-          setStatus(`OAuth Error: ${errorDescription || error}`);
-          setTimeout(() => {
-            router.push(`/login?error=admin_error&message=${encodeURIComponent(errorDescription || error)}`);
-          }, 5000);
-          return;
-        }
+      // Give a moment for the client to process the URL hash
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-        if (!code) {
-          addDebug("No code in URL, checking for existing session...");
-          const supabase = createClient();
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (session) {
-            addDebug("Session found! Redirecting to dashboard...");
-            router.push("/dashboard");
-            return;
-          }
-          
-          setStatus("No authentication code received");
-          return;
-        }
+      // Check if we have a session now
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-        // We have a code - try to exchange it
-        addDebug("Creating Supabase client...");
-        const supabase = createClient();
-        
-        addDebug("Attempting to exchange code for session...");
-        setStatus("Exchanging code for session...");
-        
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        
-        if (exchangeError) {
-          addDebug(`Exchange error: ${exchangeError.message}`);
-          setStatus(`Error: ${exchangeError.message}`);
-          return;
-        }
-
-        addDebug("Code exchange successful!");
-        addDebug(`User: ${data.user?.email || 'unknown'}`);
-        setStatus("Success! Redirecting to dashboard...");
-        
+      if (error) {
+        console.error("Auth error:", error.message);
+        setStatus(`Error: ${error.message}`);
         setTimeout(() => {
-          router.push("/dashboard");
-        }, 1000);
-        
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        addDebug(`Caught error: ${errorMsg}`);
-        setStatus(`Error: ${errorMsg}`);
+          router.push(`/login?error=admin_error&message=${encodeURIComponent(error.message)}`);
+        }, 2000);
+        return;
       }
+
+      if (session) {
+        console.log("Session found!", session.user.email);
+        setStatus("Success! Redirecting to dashboard...");
+        router.push("/dashboard");
+        return;
+      }
+
+      // No session yet - check URL for errors
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hashError = hashParams.get("error");
+      const hashErrorDesc = hashParams.get("error_description");
+
+      if (hashError) {
+        setStatus(`Error: ${hashErrorDesc || hashError}`);
+        setTimeout(() => {
+          router.push(`/login?error=admin_error&message=${encodeURIComponent(hashErrorDesc || hashError)}`);
+        }, 2000);
+        return;
+      }
+
+      // Still no session - might need to wait for onAuthStateChange
+      setStatus("Waiting for authentication...");
+      
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log("Auth state changed:", event);
+        if (event === 'SIGNED_IN' && session) {
+          setStatus("Success! Redirecting...");
+          subscription.unsubscribe();
+          router.push("/dashboard");
+        }
+      });
+
+      // Timeout fallback
+      setTimeout(() => {
+        setStatus("Authentication timeout. Please try again.");
+        subscription.unsubscribe();
+        router.push("/login?error=admin_error&message=" + encodeURIComponent("Authentication timeout"));
+      }, 10000);
     };
 
     handleCallback();
@@ -94,18 +76,9 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="text-center max-w-lg w-full">
+      <div className="text-center">
         <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-white text-lg mb-4">{status}</p>
-        
-        {debugInfo.length > 0 && (
-          <div className="mt-4 p-4 bg-gray-800 rounded-lg text-left overflow-auto max-h-64">
-            <p className="text-gray-400 text-xs font-mono mb-2">Debug Info:</p>
-            {debugInfo.map((info, i) => (
-              <p key={i} className="text-gray-500 text-xs font-mono break-all">{info}</p>
-            ))}
-          </div>
-        )}
+        <p className="text-white text-lg">{status}</p>
       </div>
     </div>
   );
