@@ -210,7 +210,7 @@ export default function DeliveriesPage() {
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
 
   // Get unique dates with deliveries
-  const deliveryDates = [...new Set(deliveries.map((d) => d.scheduledDate))].sort();
+  const deliveryDates = Array.from(new Set(deliveries.map((d) => d.scheduledDate))).sort();
 
   // Filter deliveries for selected date or show all
   const filteredDeliveries = deliveries.filter(
