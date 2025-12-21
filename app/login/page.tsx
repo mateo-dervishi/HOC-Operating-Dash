@@ -28,7 +28,7 @@ function LoginForm() {
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "azure",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: "https://hoc-operating-dash.vercel.app/auth/callback",
         scopes: "email profile openid",
       },
     });
