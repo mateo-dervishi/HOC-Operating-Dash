@@ -6,17 +6,29 @@ import {
   ClientProfile, 
   ClientSelectionItem, 
   SelectionSubmission,
-  LeadPayment,
-  LeadNote,
-  LeadActivity,
+  LeadPriority,
+  LeadSource,
 } from "@/types/leads";
+
+// Pipeline data from client_pipeline table
+interface PipelineData {
+  id: string;
+  client_id: string;
+  status?: LeadStatus;
+  priority?: LeadPriority;
+  source?: LeadSource;
+  assigned_to?: string | null;
+  last_contacted_at?: string | null;
+  next_follow_up?: string | null;
+  meeting_scheduled_at?: string | null;
+}
 
 // Determine lead status based on available data
 function determineLeadStatus(
   profile: ClientProfile,
   selections: ClientSelectionItem[],
   submission: SelectionSubmission | null,
-  pipelineData?: { status?: LeadStatus }
+  pipelineData?: PipelineData
 ): LeadStatus {
   // If we have pipeline data with explicit status, use it
   if (pipelineData?.status) {
@@ -106,8 +118,8 @@ export async function fetchLeads(): Promise<Lead[]> {
     ) || null;
     
     const pipeline = (pipelineData || []).find(
-      (p: { client_id?: string }) => p.client_id === profile.id
-    );
+      (p: PipelineData) => p.client_id === profile.id
+    ) as PipelineData | undefined;
     
     const selectionValue = calculateSelectionValue(selections);
     const status = determineLeadStatus(profile, selections, submission, pipeline);
