@@ -16,6 +16,7 @@ import {
   Menu,
   Search,
   UsersRound,
+  CheckSquare,
 } from "lucide-react";
 import { useState } from "react";
 import { AdminUser } from "@/types/admin";
@@ -34,6 +35,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Clients", href: "/dashboard/clients", icon: Users },
+  { name: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
   { name: "Quotes", href: "/dashboard/quotes", icon: FileText },
   { name: "Orders", href: "/dashboard/orders", icon: Package },
   { name: "Deliveries", href: "/dashboard/deliveries", icon: Truck },

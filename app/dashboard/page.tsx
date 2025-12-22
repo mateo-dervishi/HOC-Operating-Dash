@@ -5,7 +5,7 @@ import {
   Users,
   FileText,
   Package,
-  TrendingUp,
+  CheckSquare,
   Clock,
   Truck,
   AlertCircle,
@@ -19,16 +19,25 @@ function getMockMetrics(): DashboardMetrics {
     leadsThisMonth: 47,
     quotesNeedingResponse: 8,
     ordersInProgress: 15,
-    revenueThisMonth: 124500,
+    revenueThisMonth: 124500, // Kept in type but not displayed
     overdueFollowUps: 3,
     totalClients: 156,
     deliveriesThisWeek: 6,
   };
 }
 
+function getMockTaskStats() {
+  return {
+    pendingTasks: 5,
+    overdueTasks: 2,
+    tasksCompletedToday: 3,
+  };
+}
+
 export default async function DashboardPage() {
   const adminUser = await requireAdmin();
   const metrics = getMockMetrics();
+  const taskStats = getMockTaskStats();
 
   const statCards = [
     {
@@ -53,11 +62,12 @@ export default async function DashboardPage() {
       href: "/dashboard/orders?status=in_progress",
     },
     {
-      title: "Revenue (Month)",
-      value: `£${metrics.revenueThisMonth.toLocaleString("en-GB")}`,
-      subtitle: new Date().toLocaleDateString("en-GB", { month: "long" }),
-      icon: TrendingUp,
-      href: "/dashboard/orders?status=completed",
+      title: "Pending Tasks",
+      value: taskStats.pendingTasks,
+      subtitle: taskStats.overdueTasks > 0 ? `${taskStats.overdueTasks} overdue` : "All on track",
+      icon: CheckSquare,
+      href: "/dashboard/tasks",
+      alert: taskStats.overdueTasks > 0,
     },
   ];
 
@@ -101,17 +111,23 @@ export default async function DashboardPage() {
           <Link
             key={stat.title}
             href={stat.href}
-            className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all group"
+            className={`rounded-xl p-6 border transition-all group ${
+              stat.alert 
+                ? "bg-red-500/5 border-red-500/20 hover:bg-red-500/10" 
+                : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+            }`}
           >
             <div className="flex items-start justify-between mb-4">
-              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-                <stat.icon className="w-6 h-6 text-white" />
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                stat.alert ? "bg-red-500/10" : "bg-white/10"
+              }`}>
+                <stat.icon className={`w-6 h-6 ${stat.alert ? "text-red-400" : "text-white"}`} />
               </div>
               <ArrowRight className="w-4 h-4 text-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <p className="text-3xl font-light text-white">{stat.value}</p>
+            <p className={`text-3xl font-light ${stat.alert ? "text-red-400" : "text-white"}`}>{stat.value}</p>
             <p className="text-sm text-white/60 mt-1 font-light">{stat.title}</p>
-            <p className="text-xs text-white/40 mt-0.5 font-light">{stat.subtitle}</p>
+            <p className={`text-xs mt-0.5 font-light ${stat.alert ? "text-red-400/60" : "text-white/40"}`}>{stat.subtitle}</p>
           </Link>
         ))}
       </div>
