@@ -234,8 +234,9 @@ export async function updateLeadStatus(
   const supabase = createClient();
   
   // Check if pipeline entry exists
-  const { data: existing } = await supabase
-    .from("client_pipeline")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (supabase
+    .from("client_pipeline") as any)
     .select("id")
     .eq("client_id", leadId)
     .single();
@@ -250,15 +251,17 @@ export async function updateLeadStatus(
   if (additionalData?.nextFollowUp) updateData.next_follow_up = additionalData.nextFollowUp;
   
   if (existing) {
-    const { error } = await supabase
-      .from("client_pipeline")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase
+      .from("client_pipeline") as any)
       .update(updateData)
       .eq("client_id", leadId);
     
     return !error;
   } else {
-    const { error } = await supabase
-      .from("client_pipeline")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase
+      .from("client_pipeline") as any)
       .insert({
         client_id: leadId,
         created_at: new Date().toISOString(),
@@ -278,8 +281,9 @@ export async function addLeadNote(
 ): Promise<boolean> {
   const supabase = createClient();
   
-  const { error } = await supabase
-    .from("client_notes")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase
+    .from("client_notes") as any)
     .insert({
       client_id: leadId,
       author_id: authorId,
