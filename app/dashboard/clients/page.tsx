@@ -1,18 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
-  Filter,
-  MoreHorizontal,
   Phone,
   Mail,
   Calendar,
   FileText,
   CreditCard,
-  MessageSquare,
-  ChevronRight,
   X,
   Clock,
   CheckCircle2,
@@ -20,165 +16,21 @@ import {
   ArrowRight,
   DollarSign,
   Package,
-  Truck,
   Users,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
+import {
+  fetchPipelineClients,
+  getPipelineStats,
+  updatePipelineStage,
+  type PipelineClient,
+  type PipelineStage,
+  type PipelineStats,
+  type Priority,
+} from "@/lib/services/pipeline";
 
-// Pipeline stages for submitted clients
-type PipelineStage =
-  | "submitted"        // Just submitted - needs review
-  | "contacted"        // Team has reached out
-  | "meeting_scheduled" // Meeting booked
-  | "quoted"           // Quote sent
-  | "deposit_paid"     // 20% deposit received
-  | "in_production"    // 70% paid, in production
-  | "ready_delivery"   // Ready for delivery, awaiting final 10%
-  | "completed";       // Fully delivered and paid
-
-interface PipelineClient {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  stage: PipelineStage;
-  selectionCount: number;
-  selectionValue: number;
-  submittedAt: string;
-  lastContactedAt?: string;
-  meetingDate?: string;
-  quoteValue?: number;
-  depositPaid?: number;
-  productionPaid?: number;
-  finalPaid?: number;
-  assignedTo?: string;
-  notes?: string;
-  priority: "normal" | "high" | "urgent";
-}
-
-// Mock data - only submitted clients
-const MOCK_PIPELINE_CLIENTS: PipelineClient[] = [
-  {
-    id: "1",
-    name: "James Richardson",
-    email: "james@richardson.com",
-    phone: "+44 7700 900123",
-    stage: "quoted",
-    selectionCount: 8,
-    selectionValue: 45000,
-    submittedAt: "2024-12-15",
-    lastContactedAt: "2024-12-20",
-    meetingDate: "2024-12-18",
-    quoteValue: 42500,
-    assignedTo: "Sarah",
-    priority: "high",
-  },
-  {
-    id: "2",
-    name: "Charlotte Wilson",
-    email: "c.wilson@business.com",
-    phone: "+44 7700 900321",
-    stage: "deposit_paid",
-    selectionCount: 12,
-    selectionValue: 67000,
-    submittedAt: "2024-12-10",
-    lastContactedAt: "2024-12-19",
-    meetingDate: "2024-12-12",
-    quoteValue: 64000,
-    depositPaid: 12800,
-    assignedTo: "Tom",
-    priority: "normal",
-  },
-  {
-    id: "3",
-    name: "Michael Brown",
-    email: "m.brown@company.co.uk",
-    phone: "+44 7700 900789",
-    stage: "submitted",
-    selectionCount: 5,
-    selectionValue: 28000,
-    submittedAt: "2024-12-21",
-    priority: "urgent",
-    notes: "Called earlier, very keen to proceed",
-  },
-  {
-    id: "4",
-    name: "Isabella Moore",
-    email: "isabella.m@email.co.uk",
-    stage: "contacted",
-    selectionCount: 4,
-    selectionValue: 19500,
-    submittedAt: "2024-12-18",
-    lastContactedAt: "2024-12-20",
-    assignedTo: "Sarah",
-    priority: "normal",
-  },
-  {
-    id: "5",
-    name: "Oliver Harris",
-    email: "oliver.h@email.com",
-    phone: "+44 7700 900555",
-    stage: "meeting_scheduled",
-    selectionCount: 6,
-    selectionValue: 32000,
-    submittedAt: "2024-12-14",
-    lastContactedAt: "2024-12-16",
-    meetingDate: "2024-12-23",
-    assignedTo: "Tom",
-    priority: "normal",
-  },
-  {
-    id: "6",
-    name: "Emily Watson",
-    email: "emily.w@gmail.com",
-    stage: "in_production",
-    selectionCount: 9,
-    selectionValue: 52000,
-    submittedAt: "2024-11-20",
-    lastContactedAt: "2024-12-15",
-    meetingDate: "2024-11-25",
-    quoteValue: 49500,
-    depositPaid: 9900,
-    productionPaid: 34650,
-    assignedTo: "Sarah",
-    priority: "normal",
-  },
-  {
-    id: "7",
-    name: "William Taylor",
-    email: "w.taylor@business.co.uk",
-    phone: "+44 7700 900666",
-    stage: "ready_delivery",
-    selectionCount: 7,
-    selectionValue: 38000,
-    submittedAt: "2024-11-01",
-    lastContactedAt: "2024-12-18",
-    meetingDate: "2024-11-05",
-    quoteValue: 36000,
-    depositPaid: 7200,
-    productionPaid: 25200,
-    assignedTo: "Tom",
-    priority: "high",
-    notes: "Delivery scheduled for Dec 28",
-  },
-  {
-    id: "8",
-    name: "Grace Anderson",
-    email: "grace.a@email.com",
-    stage: "completed",
-    selectionCount: 5,
-    selectionValue: 24000,
-    submittedAt: "2024-10-15",
-    lastContactedAt: "2024-12-01",
-    meetingDate: "2024-10-20",
-    quoteValue: 23000,
-    depositPaid: 4600,
-    productionPaid: 16100,
-    finalPaid: 2300,
-    assignedTo: "Sarah",
-    priority: "normal",
-  },
-];
-
+// Stage display info
 const STAGE_INFO: Record<PipelineStage, { label: string; color: string; bgColor: string }> = {
   submitted: { label: "New Submission", color: "text-purple-400", bgColor: "bg-purple-500/20" },
   contacted: { label: "Contacted", color: "text-blue-400", bgColor: "bg-blue-500/20" },
@@ -188,12 +40,13 @@ const STAGE_INFO: Record<PipelineStage, { label: string; color: string; bgColor:
   in_production: { label: "In Production", color: "text-orange-400", bgColor: "bg-orange-500/20" },
   ready_delivery: { label: "Ready for Delivery", color: "text-pink-400", bgColor: "bg-pink-500/20" },
   completed: { label: "Completed", color: "text-white/60", bgColor: "bg-white/10" },
+  lost: { label: "Lost", color: "text-red-400", bgColor: "bg-red-500/20" },
 };
 
-const PRIORITY_INFO: Record<string, { color: string }> = {
-  normal: { color: "border-white/10" },
-  high: { color: "border-yellow-500/50" },
-  urgent: { color: "border-red-500/50" },
+const PRIORITY_INFO: Record<Priority, { color: string; label: string }> = {
+  normal: { color: "border-white/10", label: "Normal" },
+  high: { color: "border-yellow-500/50", label: "High" },
+  urgent: { color: "border-red-500/50", label: "Urgent" },
 };
 
 // Helper functions
@@ -208,24 +61,26 @@ function formatCurrency(value: number): string {
   return `£${value.toLocaleString()}`;
 }
 
-function calculatePaymentProgress(client: PipelineClient): { paid: number; total: number; percentage: number } {
+function calculatePaymentPercentage(client: PipelineClient): number {
   const total = client.quoteValue || client.selectionValue;
-  const paid = (client.depositPaid || 0) + (client.productionPaid || 0) + (client.finalPaid || 0);
-  return { paid, total, percentage: Math.round((paid / total) * 100) };
+  if (total === 0) return 0;
+  return Math.round((client.totalPaid / total) * 100);
 }
 
 // Components
-function PipelineStats({ clients }: { clients: PipelineClient[] }) {
-  const stats = useMemo(() => {
-    const newSubmissions = clients.filter((c) => c.stage === "submitted").length;
-    const activeDeals = clients.filter((c) => !["completed", "submitted"].includes(c.stage)).length;
-    const totalPipelineValue = clients
-      .filter((c) => c.stage !== "completed")
-      .reduce((sum, c) => sum + (c.quoteValue || c.selectionValue), 0);
-    const completedThisMonth = clients.filter((c) => c.stage === "completed").length;
-
-    return { newSubmissions, activeDeals, totalPipelineValue, completedThisMonth };
-  }, [clients]);
+function PipelineStatsComponent({ stats, isLoading }: { stats: PipelineStats | null; isLoading: boolean }) {
+  if (isLoading || !stats) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-4 animate-pulse">
+            <div className="h-4 bg-white/10 rounded w-20 mb-2" />
+            <div className="h-8 bg-white/10 rounded w-12" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -268,7 +123,7 @@ function ClientCard({
   client: PipelineClient;
   onClick: () => void;
 }) {
-  const paymentProgress = calculatePaymentProgress(client);
+  const paymentPercentage = calculatePaymentPercentage(client);
 
   return (
     <motion.div
@@ -299,16 +154,16 @@ function ClientCard({
       </div>
 
       {/* Payment Progress (if applicable) */}
-      {client.depositPaid && (
+      {client.totalPaid > 0 && (
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs text-white/40 mb-1">
             <span>Payment</span>
-            <span>{paymentProgress.percentage}%</span>
+            <span>{paymentPercentage}%</span>
           </div>
           <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full bg-green-500 rounded-full transition-all"
-              style={{ width: `${paymentProgress.percentage}%` }}
+              style={{ width: `${paymentPercentage}%` }}
             />
           </div>
         </div>
@@ -316,7 +171,7 @@ function ClientCard({
 
       {/* Assigned & Date */}
       <div className="flex items-center justify-between text-xs text-white/40">
-        {client.assignedTo && <span>{client.assignedTo}</span>}
+        {client.assignedToName && <span>{client.assignedToName}</span>}
         <span>{formatDate(client.submittedAt)}</span>
       </div>
     </motion.div>
@@ -371,7 +226,7 @@ function ClientDetailPanel({
   onStageChange: (clientId: string, newStage: PipelineStage) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"overview" | "payments" | "notes">("overview");
-  const paymentProgress = calculatePaymentProgress(client);
+  const paymentPercentage = calculatePaymentPercentage(client);
   const stageInfo = STAGE_INFO[client.stage];
 
   // Calculate payment milestones
@@ -448,7 +303,7 @@ function ClientDetailPanel({
         </div>
 
         {/* Move to Next Stage */}
-        {nextStage && (
+        {nextStage && client.stage !== "lost" && (
           <button
             onClick={() => onStageChange(client.id, nextStage)}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white text-black rounded-lg hover:bg-white/90 transition-colors mb-6"
@@ -485,6 +340,9 @@ function ClientDetailPanel({
                 <div>
                   <p className="text-2xl font-light text-white">{client.selectionCount} items</p>
                   <p className="text-white/60">{formatCurrency(client.selectionValue)} total value</p>
+                  {client.quoteValue && client.quoteValue !== client.selectionValue && (
+                    <p className="text-sm text-green-400">Quoted: {formatCurrency(client.quoteValue)}</p>
+                  )}
                 </div>
                 <Package className="w-8 h-8 text-white/20" />
               </div>
@@ -529,10 +387,10 @@ function ClientDetailPanel({
             </div>
 
             {/* Assigned To */}
-            {client.assignedTo && (
+            {client.assignedToName && (
               <div className="bg-white/5 rounded-lg p-4">
                 <p className="text-xs text-white/40 mb-1">Assigned To</p>
-                <p className="text-white">{client.assignedTo}</p>
+                <p className="text-white">{client.assignedToName}</p>
               </div>
             )}
           </div>
@@ -545,16 +403,16 @@ function ClientDetailPanel({
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm text-white/40">Payment Progress</h3>
                 <span className="text-white font-light">
-                  {formatCurrency(paymentProgress.paid)} / {formatCurrency(paymentProgress.total)}
+                  {formatCurrency(client.totalPaid)} / {formatCurrency(quoteValue)}
                 </span>
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-2">
                 <div
                   className="h-full bg-green-500 rounded-full transition-all"
-                  style={{ width: `${paymentProgress.percentage}%` }}
+                  style={{ width: `${paymentPercentage}%` }}
                 />
               </div>
-              <p className="text-right text-sm text-white/40">{paymentProgress.percentage}% paid</p>
+              <p className="text-right text-sm text-white/40">{paymentPercentage}% paid</p>
             </div>
 
             {/* Payment Milestones */}
@@ -653,14 +511,36 @@ function ClientDetailPanel({
 
 // Main Page
 export default function ClientPipelinePage() {
-  const [clients, setClients] = useState<PipelineClient[]>(MOCK_PIPELINE_CLIENTS);
+  const [clients, setClients] = useState<PipelineClient[]>([]);
+  const [stats, setStats] = useState<PipelineStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClient, setSelectedClient] = useState<PipelineClient | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
 
+  // Fetch data on mount
+  useEffect(() => {
+    loadPipelineData();
+  }, []);
+
+  const loadPipelineData = async () => {
+    setIsLoading(true);
+    try {
+      const fetchedClients = await fetchPipelineClients();
+      setClients(fetchedClients);
+      
+      const fetchedStats = getPipelineStats(fetchedClients);
+      setStats(fetchedStats);
+    } catch (error) {
+      console.error("Error loading pipeline data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Get unique assignees
   const assignees = useMemo(() => {
-    const unique = new Set(clients.map((c) => c.assignedTo).filter(Boolean));
+    const unique = new Set(clients.map((c) => c.assignedToName).filter(Boolean));
     return Array.from(unique) as string[];
   }, [clients]);
 
@@ -676,7 +556,7 @@ export default function ClientPipelinePage() {
           return false;
         }
       }
-      if (assigneeFilter !== "all" && client.assignedTo !== assigneeFilter) {
+      if (assigneeFilter !== "all" && client.assignedToName !== assigneeFilter) {
         return false;
       }
       return true;
@@ -702,14 +582,25 @@ export default function ClientPipelinePage() {
   }, [filteredClients]);
 
   // Handle stage change
-  const handleStageChange = (clientId: string, newStage: PipelineStage) => {
+  const handleStageChange = async (clientId: string, newStage: PipelineStage) => {
+    // Optimistic update
     setClients((prev) =>
       prev.map((c) => (c.id === clientId ? { ...c, stage: newStage } : c))
     );
+    
     // Update selected client if it's the one being changed
     setSelectedClient((prev) =>
       prev?.id === clientId ? { ...prev, stage: newStage } : prev
     );
+    
+    // Update in database
+    await updatePipelineStage(clientId, newStage);
+    
+    // Recalculate stats
+    const updatedStats = getPipelineStats(
+      clients.map((c) => (c.id === clientId ? { ...c, stage: newStage } : c))
+    );
+    setStats(updatedStats);
   };
 
   return (
@@ -720,17 +611,27 @@ export default function ClientPipelinePage() {
           <h1 className="text-2xl font-light text-white">Client Pipeline</h1>
           <p className="text-white/40">Manage clients who have submitted selections</p>
         </div>
-        <a
-          href="/dashboard/leads"
-          className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          <Users className="w-4 h-4" />
-          View All Leads
-        </a>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadPipelineData}
+            disabled={isLoading}
+            className="p-2 bg-white/5 border border-white/10 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
+          <a
+            href="/dashboard/leads"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <Users className="w-4 h-4" />
+            View All Leads
+          </a>
+        </div>
       </div>
 
       {/* Stats */}
-      <PipelineStats clients={clients} />
+      <PipelineStatsComponent stats={stats} isLoading={isLoading} />
 
       {/* Search & Filters */}
       <div className="flex flex-col md:flex-row gap-4">
@@ -759,18 +660,24 @@ export default function ClientPipelinePage() {
       </div>
 
       {/* Kanban Board */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-w-max">
-          {(Object.keys(clientsByStage) as PipelineStage[]).map((stage) => (
-            <KanbanColumn
-              key={stage}
-              stage={stage}
-              clients={clientsByStage[stage]}
-              onClientClick={setSelectedClient}
-            />
-          ))}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
         </div>
-      </div>
+      ) : (
+        <div className="overflow-x-auto pb-4">
+          <div className="flex gap-4 min-w-max">
+            {(Object.keys(clientsByStage) as PipelineStage[]).map((stage) => (
+              <KanbanColumn
+                key={stage}
+                stage={stage}
+                clients={clientsByStage[stage]}
+                onClientClick={setSelectedClient}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Client Detail Panel */}
       <AnimatePresence>

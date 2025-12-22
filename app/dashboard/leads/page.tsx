@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -11,11 +11,8 @@ import {
   MessageSquare,
   MoreHorizontal,
   ChevronDown,
-  ChevronRight,
   Calendar,
-  TrendingUp,
   Users,
-  UserPlus,
   AlertCircle,
   Flame,
   Snowflake,
@@ -23,177 +20,25 @@ import {
   Download,
   Eye,
   ArrowRight,
-  Clock,
-  CheckCircle2,
   X,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { AddClientForm, ClientFormData } from "@/components/forms/AddClientForm";
+import {
+  fetchMarketingLeads,
+  getMarketingLeadStats,
+  updateLeadInterest,
+  logOutreach,
+  type MarketingLead,
+  type MarketingLeadStats,
+  type InterestLevel,
+  type LeadStatus,
+  type LeadSource,
+} from "@/lib/services/marketing-leads";
 
-// Types
-type InterestLevel = "cold" | "warm" | "hot";
-type LeadStatus = "registered" | "browsing" | "submitted" | "newsletter_only";
-type LeadSource = "website_signup" | "website_newsletter" | "coming_soon" | "referral" | "social" | "phone" | "walk_in" | "other";
-
-interface Lead {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  source: LeadSource;
-  status: LeadStatus;
-  interest: InterestLevel;
-  selectionCount: number;
-  selectionValue: number;
-  createdAt: string;
-  lastActivityAt: string;
-  lastOutreachAt?: string;
-  notes?: string;
-  tags: string[];
-}
-
-// Mock data
-const MOCK_LEADS: Lead[] = [
-  {
-    id: "1",
-    name: "James Richardson",
-    email: "james@richardson.com",
-    phone: "+44 7700 900123",
-    source: "website_signup",
-    status: "browsing",
-    interest: "hot",
-    selectionCount: 8,
-    selectionValue: 45000,
-    createdAt: "2024-12-01",
-    lastActivityAt: "2024-12-20",
-    tags: ["high-value", "returning"],
-  },
-  {
-    id: "2",
-    name: "Sarah Mitchell",
-    email: "sarah@mitchellhome.co.uk",
-    phone: "+44 7700 900456",
-    source: "referral",
-    status: "browsing",
-    interest: "warm",
-    selectionCount: 3,
-    selectionValue: 12500,
-    createdAt: "2024-12-10",
-    lastActivityAt: "2024-12-18",
-    lastOutreachAt: "2024-12-15",
-    tags: [],
-  },
-  {
-    id: "3",
-    name: "David Thompson",
-    email: "david.t@email.com",
-    source: "website_signup",
-    status: "registered",
-    interest: "cold",
-    selectionCount: 0,
-    selectionValue: 0,
-    createdAt: "2024-11-15",
-    lastActivityAt: "2024-11-15",
-    tags: ["needs-follow-up"],
-  },
-  {
-    id: "4",
-    name: "Emma Williams",
-    email: "emma.w@gmail.com",
-    source: "website_newsletter",
-    status: "newsletter_only",
-    interest: "warm",
-    selectionCount: 0,
-    selectionValue: 0,
-    createdAt: "2024-12-05",
-    lastActivityAt: "2024-12-05",
-    tags: ["newsletter"],
-  },
-  {
-    id: "5",
-    name: "Michael Brown",
-    email: "m.brown@company.co.uk",
-    phone: "+44 7700 900789",
-    source: "phone",
-    status: "registered",
-    interest: "hot",
-    selectionCount: 5,
-    selectionValue: 28000,
-    createdAt: "2024-12-18",
-    lastActivityAt: "2024-12-21",
-    lastOutreachAt: "2024-12-19",
-    tags: ["phone-inquiry"],
-  },
-  {
-    id: "6",
-    name: "Sophie Clark",
-    email: "sophie.clark@email.com",
-    source: "social",
-    status: "browsing",
-    interest: "warm",
-    selectionCount: 2,
-    selectionValue: 8500,
-    createdAt: "2024-12-12",
-    lastActivityAt: "2024-12-19",
-    tags: ["instagram"],
-  },
-  {
-    id: "7",
-    name: "Oliver Davies",
-    email: "oliver@davies.net",
-    source: "coming_soon",
-    status: "newsletter_only",
-    interest: "cold",
-    selectionCount: 0,
-    selectionValue: 0,
-    createdAt: "2024-10-20",
-    lastActivityAt: "2024-10-20",
-    tags: ["coming-soon"],
-  },
-  {
-    id: "8",
-    name: "Charlotte Wilson",
-    email: "c.wilson@business.com",
-    phone: "+44 7700 900321",
-    source: "walk_in",
-    status: "browsing",
-    interest: "hot",
-    selectionCount: 12,
-    selectionValue: 67000,
-    createdAt: "2024-12-15",
-    lastActivityAt: "2024-12-21",
-    lastOutreachAt: "2024-12-20",
-    tags: ["showroom-visit", "high-value"],
-  },
-  {
-    id: "9",
-    name: "George Taylor",
-    email: "george.t@outlook.com",
-    source: "website_signup",
-    status: "registered",
-    interest: "cold",
-    selectionCount: 1,
-    selectionValue: 2400,
-    createdAt: "2024-11-28",
-    lastActivityAt: "2024-11-30",
-    tags: [],
-  },
-  {
-    id: "10",
-    name: "Isabella Moore",
-    email: "isabella.m@email.co.uk",
-    source: "referral",
-    status: "browsing",
-    interest: "warm",
-    selectionCount: 4,
-    selectionValue: 19500,
-    createdAt: "2024-12-08",
-    lastActivityAt: "2024-12-17",
-    notes: "Referred by James Richardson",
-    tags: ["referral-program"],
-  },
-];
-
+// Display info
 const SOURCE_INFO: Record<LeadSource, { label: string; color: string }> = {
   website_signup: { label: "Website", color: "bg-white/20" },
   website_newsletter: { label: "Newsletter", color: "bg-blue-500/20" },
@@ -208,7 +53,6 @@ const SOURCE_INFO: Record<LeadSource, { label: string; color: string }> = {
 const STATUS_INFO: Record<LeadStatus, { label: string; color: string }> = {
   registered: { label: "Registered", color: "text-white/60" },
   browsing: { label: "Browsing", color: "text-blue-400" },
-  submitted: { label: "Submitted", color: "text-green-400" },
   newsletter_only: { label: "Newsletter Only", color: "text-purple-400" },
 };
 
@@ -235,16 +79,19 @@ function formatDate(dateString: string): string {
 }
 
 // Components
-function QuickStats({ leads }: { leads: Lead[] }) {
-  const stats = useMemo(() => {
-    const total = leads.length;
-    const hot = leads.filter((l) => l.interest === "hot").length;
-    const needsFollowUp = leads.filter((l) => getDaysSince(l.lastActivityAt) > 14).length;
-    const newsletterOnly = leads.filter((l) => l.status === "newsletter_only").length;
-    const browsing = leads.filter((l) => l.status === "browsing").length;
-
-    return { total, hot, needsFollowUp, newsletterOnly, browsing };
-  }, [leads]);
+function QuickStats({ stats, isLoading }: { stats: MarketingLeadStats | null; isLoading: boolean }) {
+  if (isLoading || !stats) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-4 animate-pulse">
+            <div className="h-4 bg-white/10 rounded w-20 mb-2" />
+            <div className="h-8 bg-white/10 rounded w-12" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -293,10 +140,10 @@ function LeadRow({
   onLogActivity,
   onViewDetails,
 }: {
-  lead: Lead;
+  lead: MarketingLead;
   onInterestChange: (id: string, interest: InterestLevel) => void;
   onLogActivity: (id: string, type: "email" | "call" | "note") => void;
-  onViewDetails: (lead: Lead) => void;
+  onViewDetails: (lead: MarketingLead) => void;
 }) {
   const [showInterestMenu, setShowInterestMenu] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
@@ -452,7 +299,7 @@ function LeadDetailPanel({
   onClose,
   onLogActivity,
 }: {
-  lead: Lead;
+  lead: MarketingLead;
   onClose: () => void;
   onLogActivity: (id: string, type: "email" | "call" | "note", content?: string) => void;
 }) {
@@ -581,7 +428,7 @@ function LeadDetailPanel({
           </button>
         </div>
 
-        {/* Timeline / Notes */}
+        {/* Notes */}
         {lead.notes && (
           <div>
             <p className="text-xs text-white/40 mb-2">Notes</p>
@@ -607,13 +454,13 @@ function NewSubmissionsAlert({ count, onView }: { count: number; onView: () => v
     >
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-          <CheckCircle2 className="w-5 h-5 text-green-400" />
+          <ArrowRight className="w-5 h-5 text-green-400" />
         </div>
         <div>
           <p className="text-white font-light">
-            {count} new submission{count > 1 ? "s" : ""} ready for review
+            {count} lead{count > 1 ? "s have" : " has"} submitted their selection
           </p>
-          <p className="text-sm text-white/60">These leads are ready to move to the pipeline</p>
+          <p className="text-sm text-white/60">Ready to move to the sales pipeline</p>
         </div>
       </div>
       <button
@@ -629,22 +476,45 @@ function NewSubmissionsAlert({ count, onView }: { count: number; onView: () => v
 
 // Main Page Component
 export default function LeadsPage() {
-  const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
+  const [leads, setLeads] = useState<MarketingLead[]>([]);
+  const [stats, setStats] = useState<MarketingLeadStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<LeadSource | "all">("all");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
   const [interestFilter, setInterestFilter] = useState<InterestLevel | "all">("all");
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "stale">("all");
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedLead, setSelectedLead] = useState<MarketingLead | null>(null);
   const [showAddLead, setShowAddLead] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [submittedCount, setSubmittedCount] = useState(0);
+
+  // Fetch leads on mount
+  useEffect(() => {
+    loadLeads();
+  }, []);
+
+  const loadLeads = async () => {
+    setIsLoading(true);
+    try {
+      const fetchedLeads = await fetchMarketingLeads();
+      setLeads(fetchedLeads);
+      
+      const fetchedStats = await getMarketingLeadStats(fetchedLeads);
+      setStats(fetchedStats);
+      
+      // TODO: Get actual submitted count from pipeline
+      setSubmittedCount(3); // Mock for now
+    } catch (error) {
+      console.error("Error loading leads:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Filter leads
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
-      // Exclude submitted leads - they go to pipeline
-      if (lead.status === "submitted") return false;
-
       // Search
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -676,43 +546,60 @@ export default function LeadsPage() {
     });
   }, [leads, searchQuery, sourceFilter, statusFilter, interestFilter, activityFilter]);
 
-  // Count submitted leads (for alert)
-  const submittedCount = leads.filter((l) => l.status === "submitted").length;
-
   // Handlers
-  const handleInterestChange = (id: string, interest: InterestLevel) => {
+  const handleInterestChange = async (id: string, interest: InterestLevel) => {
+    // Optimistic update
     setLeads((prev) =>
       prev.map((lead) => (lead.id === id ? { ...lead, interest } : lead))
     );
+    
+    // Update in database
+    await updateLeadInterest(id, interest);
+    
+    // Recalculate stats
+    const updatedStats = await getMarketingLeadStats(
+      leads.map((lead) => (lead.id === id ? { ...lead, interest } : lead))
+    );
+    setStats(updatedStats);
   };
 
-  const handleLogActivity = (id: string, type: "email" | "call" | "note", content?: string) => {
+  const handleLogActivity = async (id: string, type: "email" | "call" | "note", content?: string) => {
     console.log(`Logged ${type} for lead ${id}:`, content);
+    
+    // Log to database - map "note" to "other" for outreach type
+    const outreachType = type === "note" ? "other" : type;
+    const outcome = type === "note" ? "spoke" : `${type}_sent`;
+    await logOutreach(id, outreachType, outcome, content);
+    
     // Update last activity
     setLeads((prev) =>
       prev.map((lead) =>
         lead.id === id
-          ? { ...lead, lastActivityAt: new Date().toISOString().split("T")[0] }
+          ? { ...lead, lastActivityAt: new Date().toISOString() }
           : lead
       )
     );
   };
 
   const handleAddLead = (data: ClientFormData) => {
-    const newLead: Lead = {
+    const newLead: MarketingLead = {
       id: `new-${Date.now()}`,
       name: `${data.firstName} ${data.lastName}`,
       email: data.email,
-      phone: data.phone || undefined,
+      phone: data.phone || null,
       source: data.source as LeadSource,
       status: "registered",
       interest: "warm",
       selectionCount: 0,
       selectionValue: 0,
-      createdAt: new Date().toISOString().split("T")[0],
-      lastActivityAt: new Date().toISOString().split("T")[0],
-      notes: data.notes || undefined,
+      createdAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString(),
+      lastOutreachAt: null,
+      nextFollowUp: null,
+      notes: data.notes || null,
       tags: [],
+      isNewsletterOnly: false,
+      convertedToAccount: true,
     };
     setLeads((prev) => [newLead, ...prev]);
     setShowAddLead(false);
@@ -723,7 +610,6 @@ export default function LeadsPage() {
   };
 
   const handleExport = () => {
-    // Export filtered leads to CSV
     const headers = ["Name", "Email", "Phone", "Source", "Status", "Interest", "Selection Value", "Last Activity"];
     const rows = filteredLeads.map((lead) => [
       lead.name,
@@ -755,6 +641,14 @@ export default function LeadsPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={loadLeads}
+            disabled={isLoading}
+            className="p-2 bg-white/5 border border-white/10 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
+          <button
             onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
           >
@@ -775,7 +669,7 @@ export default function LeadsPage() {
       <NewSubmissionsAlert count={submittedCount} onView={handleViewPipeline} />
 
       {/* Quick Stats */}
-      <QuickStats leads={leads} />
+      <QuickStats stats={stats} isLoading={isLoading} />
 
       {/* Search & Filters */}
       <div className="flex flex-col md:flex-row gap-4">
@@ -875,52 +769,58 @@ export default function LeadsPage() {
 
       {/* Leads Table */}
       <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-white/10">
-              <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
-                Lead
-              </th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
-                Source
-              </th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
-                Interest
-              </th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
-                Selection
-              </th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
-                Last Activity
-              </th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLeads.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="py-12 text-center text-white/40">
-                  No leads found matching your filters
-                </td>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 text-white/40 animate-spin" />
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
+                  Lead
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
+                  Source
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
+                  Interest
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
+                  Selection
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
+                  Last Activity
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-white/40 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
-            ) : (
-              filteredLeads.map((lead) => (
-                <LeadRow
-                  key={lead.id}
-                  lead={lead}
-                  onInterestChange={handleInterestChange}
-                  onLogActivity={handleLogActivity}
-                  onViewDetails={setSelectedLead}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredLeads.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-white/40">
+                    No leads found matching your filters
+                  </td>
+                </tr>
+              ) : (
+                filteredLeads.map((lead) => (
+                  <LeadRow
+                    key={lead.id}
+                    lead={lead}
+                    onInterestChange={handleInterestChange}
+                    onLogActivity={handleLogActivity}
+                    onViewDetails={setSelectedLead}
+                  />
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Lead Detail Panel */}
@@ -959,4 +859,3 @@ export default function LeadsPage() {
     </div>
   );
 }
-
