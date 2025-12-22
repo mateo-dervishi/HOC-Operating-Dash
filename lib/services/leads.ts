@@ -154,7 +154,7 @@ export async function fetchLeads(): Promise<Lead[]> {
     const status = determineLeadStatus(profile, selections, submission, pipeline);
     
     // Normalize old "website" source to new "website_signup"
-    const rawSource = pipeline?.source || profile.lead_source || "website_signup";
+    const rawSource: string = pipeline?.source || profile.lead_source || "website_signup";
     const source: LeadSource = rawSource === "website" ? "website_signup" : rawSource as LeadSource;
     
     return {
