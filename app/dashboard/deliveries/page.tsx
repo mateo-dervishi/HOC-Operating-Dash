@@ -15,6 +15,8 @@ import {
   CheckCircle,
   Package,
 } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { ScheduleDeliveryForm, DeliveryFormData } from "@/components/forms/ScheduleDeliveryForm";
 
 type DeliveryStatus = "scheduled" | "in_transit" | "delivered" | "failed" | "rescheduled";
 
@@ -210,6 +212,13 @@ export default function DeliveriesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DeliveryStatus | "all">("all");
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
+  const [showScheduleDelivery, setShowScheduleDelivery] = useState(false);
+
+  const handleScheduleDelivery = (data: DeliveryFormData) => {
+    console.log("New delivery:", data);
+    // TODO: Add to Supabase
+    setShowScheduleDelivery(false);
+  };
 
   const filteredDeliveries = deliveries.filter((delivery) => {
     const matchesSearch =
@@ -243,7 +252,10 @@ export default function DeliveriesPage() {
             Schedule and track deliveries • {todayDeliveries.length} today
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light">
+        <button 
+          onClick={() => setShowScheduleDelivery(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light"
+        >
           <Plus className="w-4 h-4" />
           Schedule Delivery
         </button>
@@ -326,6 +338,20 @@ export default function DeliveriesPage() {
           completed this week
         </span>
       </div>
+
+      {/* Schedule Delivery Modal */}
+      <Modal
+        isOpen={showScheduleDelivery}
+        onClose={() => setShowScheduleDelivery(false)}
+        title="Schedule Delivery"
+        subtitle="Schedule a new delivery for an order"
+        size="lg"
+      >
+        <ScheduleDeliveryForm
+          onSubmit={handleScheduleDelivery}
+          onCancel={() => setShowScheduleDelivery(false)}
+        />
+      </Modal>
     </div>
   );
 }

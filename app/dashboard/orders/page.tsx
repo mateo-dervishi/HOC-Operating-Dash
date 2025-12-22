@@ -13,6 +13,8 @@ import {
   Eye,
 } from "lucide-react";
 import { ORDER_STATUSES, OrderStatus } from "@/types/admin";
+import { Modal } from "@/components/ui/Modal";
+import { CreateOrderForm, OrderFormData } from "@/components/forms/CreateOrderForm";
 
 interface Order {
   id: string;
@@ -173,6 +175,13 @@ export default function OrdersPage() {
   const [orders] = useState<Order[]>(MOCK_ORDERS);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
+
+  const handleCreateOrder = (data: OrderFormData) => {
+    console.log("New order:", data);
+    // TODO: Add to Supabase
+    setShowCreateOrder(false);
+  };
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -201,7 +210,10 @@ export default function OrdersPage() {
             Track and manage all client orders
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light">
+        <button 
+          onClick={() => setShowCreateOrder(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light"
+        >
           <Plus className="w-4 h-4" />
           Create Order
         </button>
@@ -300,6 +312,20 @@ export default function OrdersPage() {
           collected
         </span>
       </div>
+
+      {/* Create Order Modal */}
+      <Modal
+        isOpen={showCreateOrder}
+        onClose={() => setShowCreateOrder(false)}
+        title="Create Order"
+        subtitle="Create a new order for a client"
+        size="lg"
+      >
+        <CreateOrderForm
+          onSubmit={handleCreateOrder}
+          onCancel={() => setShowCreateOrder(false)}
+        />
+      </Modal>
     </div>
   );
 }

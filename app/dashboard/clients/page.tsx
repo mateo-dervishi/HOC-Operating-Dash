@@ -35,6 +35,8 @@ import {
   NurturingStatus,
 } from "@/types/leads";
 import { getMockLeads, getMockLeadStats } from "@/lib/services/leads";
+import { Modal } from "@/components/ui/Modal";
+import { AddClientForm, ClientFormData } from "@/components/forms/AddClientForm";
 
 // Pipeline stages for Kanban view
 const PIPELINE_STAGES: LeadStatus[] = [
@@ -821,10 +823,17 @@ export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [showAddClient, setShowAddClient] = useState(false);
 
   // Use mock data for now
   const leads = getMockLeads();
   const stats = getMockLeadStats();
+
+  const handleAddClient = (data: ClientFormData) => {
+    console.log("New client:", data);
+    // TODO: Add to Supabase
+    setShowAddClient(false);
+  };
 
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
@@ -859,7 +868,10 @@ export default function ClientsPage() {
             {stats.total} leads • £{stats.totalPipelineValue.toLocaleString()} pipeline value
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light">
+        <button 
+          onClick={() => setShowAddClient(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light"
+        >
           <Plus className="w-4 h-4" />
           Add Lead
         </button>
@@ -1018,6 +1030,20 @@ export default function ClientsPage() {
           />
         </>
       )}
+
+      {/* Add Client Modal */}
+      <Modal
+        isOpen={showAddClient}
+        onClose={() => setShowAddClient(false)}
+        title="Add New Lead"
+        subtitle="Create a new client profile"
+        size="lg"
+      >
+        <AddClientForm
+          onSubmit={handleAddClient}
+          onCancel={() => setShowAddClient(false)}
+        />
+      </Modal>
     </div>
   );
 }

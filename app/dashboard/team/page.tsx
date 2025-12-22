@@ -15,6 +15,8 @@ import {
   Trash2,
   Calendar,
 } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { InviteTeamMemberForm, InviteFormData } from "@/components/forms/InviteTeamMemberForm";
 
 type Role = "admin" | "manager" | "sales" | "operations";
 
@@ -205,6 +207,13 @@ export default function TeamPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [showInactive, setShowInactive] = useState(true);
+  const [showInvite, setShowInvite] = useState(false);
+
+  const handleInvite = (data: InviteFormData) => {
+    console.log("New invitation:", data);
+    // TODO: Send invitation via email/Supabase
+    setShowInvite(false);
+  };
 
   const filteredTeam = team.filter((member) => {
     const matchesSearch =
@@ -232,7 +241,10 @@ export default function TeamPage() {
             Manage team members and permissions
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light">
+        <button 
+          onClick={() => setShowInvite(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light"
+        >
           <Plus className="w-4 h-4" />
           Invite Member
         </button>
@@ -317,6 +329,20 @@ export default function TeamPage() {
           admins
         </span>
       </div>
+
+      {/* Invite Modal */}
+      <Modal
+        isOpen={showInvite}
+        onClose={() => setShowInvite(false)}
+        title="Invite Team Member"
+        subtitle="Send an invitation to join the dashboard"
+        size="md"
+      >
+        <InviteTeamMemberForm
+          onSubmit={handleInvite}
+          onCancel={() => setShowInvite(false)}
+        />
+      </Modal>
     </div>
   );
 }

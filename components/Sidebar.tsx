@@ -74,21 +74,35 @@ export function Sidebar({ adminUser, unreadNotifications = 0 }: SidebarProps) {
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
+      <div className="flex items-center justify-between min-h-[80px] px-4 border-b border-white/10">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-white flex items-center justify-center">
-            <span className="text-black text-sm font-medium">HC</span>
-          </div>
           <AnimatePresence>
-            {!isCollapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                className="text-sm font-light tracking-[0.3em] text-white overflow-hidden whitespace-nowrap"
+            {!isCollapsed ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="overflow-hidden"
               >
-                OPERATIONS
-              </motion.span>
+                <h1 className="text-[13px] font-light tracking-[0.25em] text-white leading-tight">
+                  HOUSE OF
+                </h1>
+                <h1 className="text-[13px] font-light tracking-[0.25em] text-white leading-tight">
+                  CLARENCE
+                </h1>
+                <p className="text-[10px] font-light tracking-[0.15em] text-white/50 mt-1">
+                  INTERNAL OPERATIONS
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-8 h-8 bg-white flex items-center justify-center"
+              >
+                <span className="text-black text-sm font-light">HC</span>
+              </motion.div>
             )}
           </AnimatePresence>
         </Link>

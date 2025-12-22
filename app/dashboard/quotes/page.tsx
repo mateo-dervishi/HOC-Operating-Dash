@@ -16,6 +16,8 @@ import {
   XCircle,
   Download,
 } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { CreateQuoteForm, QuoteFormData } from "@/components/forms/CreateQuoteForm";
 
 type QuoteStatus = "draft" | "sent" | "viewed" | "accepted" | "rejected" | "expired";
 
@@ -215,6 +217,13 @@ export default function QuotesPage() {
   const [quotes] = useState<Quote[]>(MOCK_QUOTES);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
+  const [showCreateQuote, setShowCreateQuote] = useState(false);
+
+  const handleCreateQuote = (data: QuoteFormData) => {
+    console.log("New quote:", data);
+    // TODO: Add to Supabase
+    setShowCreateQuote(false);
+  };
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch =
@@ -243,7 +252,10 @@ export default function QuotesPage() {
             Create and manage client quotes
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light">
+        <button 
+          onClick={() => setShowCreateQuote(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light"
+        >
           <Plus className="w-4 h-4" />
           New Quote
         </button>
@@ -342,6 +354,20 @@ export default function QuotesPage() {
           awaiting response
         </span>
       </div>
+
+      {/* Create Quote Modal */}
+      <Modal
+        isOpen={showCreateQuote}
+        onClose={() => setShowCreateQuote(false)}
+        title="Create Quote"
+        subtitle="Generate a quote for a client"
+        size="lg"
+      >
+        <CreateQuoteForm
+          onSubmit={handleCreateQuote}
+          onCancel={() => setShowCreateQuote(false)}
+        />
+      </Modal>
     </div>
   );
 }
