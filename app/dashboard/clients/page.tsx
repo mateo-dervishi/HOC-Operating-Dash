@@ -1,1159 +1,796 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Users,
-  Plus,
   Search,
   Filter,
   MoreHorizontal,
   Phone,
   Mail,
   Calendar,
-  Clock,
-  ArrowRight,
-  Eye,
-  ChevronDown,
-  Building2,
-  Package,
-  Send,
+  FileText,
+  CreditCard,
   MessageSquare,
+  ChevronRight,
+  X,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
   DollarSign,
-  TrendingUp,
+  Package,
+  Truck,
+  Users,
 } from "lucide-react";
-import { 
-  Lead, 
-  LeadStatus, 
-  LeadSource,
-  LEAD_STATUS_INFO,
-  LEAD_SOURCE_INFO,
-  PAYMENT_STAGES,
-  OUTREACH_TYPE_INFO,
-  OUTREACH_OUTCOME_INFO,
-  NURTURING_STATUS_INFO,
-  OutreachType,
-  OutreachOutcome,
-  NurturingStatus,
-  SourceStats,
-} from "@/types/leads";
-import { getMockLeads, getMockLeadStats, getMockSourceStats, getMockNewsletterSubscribers } from "@/lib/services/leads";
-import { Modal } from "@/components/ui/Modal";
-import { AddClientForm, ClientFormData } from "@/components/forms/AddClientForm";
 
-// Pipeline stages for Kanban view
-const PIPELINE_STAGES: LeadStatus[] = [
-  "registered",
-  "browsing", 
-  "submitted",
-  "contacted",
-  "meeting_scheduled",
-  "quoted",
-  "deposit_paid",
-  "in_production",
+// Pipeline stages for submitted clients
+type PipelineStage =
+  | "submitted"        // Just submitted - needs review
+  | "contacted"        // Team has reached out
+  | "meeting_scheduled" // Meeting booked
+  | "quoted"           // Quote sent
+  | "deposit_paid"     // 20% deposit received
+  | "in_production"    // 70% paid, in production
+  | "ready_delivery"   // Ready for delivery, awaiting final 10%
+  | "completed";       // Fully delivered and paid
+
+interface PipelineClient {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  stage: PipelineStage;
+  selectionCount: number;
+  selectionValue: number;
+  submittedAt: string;
+  lastContactedAt?: string;
+  meetingDate?: string;
+  quoteValue?: number;
+  depositPaid?: number;
+  productionPaid?: number;
+  finalPaid?: number;
+  assignedTo?: string;
+  notes?: string;
+  priority: "normal" | "high" | "urgent";
+}
+
+// Mock data - only submitted clients
+const MOCK_PIPELINE_CLIENTS: PipelineClient[] = [
+  {
+    id: "1",
+    name: "James Richardson",
+    email: "james@richardson.com",
+    phone: "+44 7700 900123",
+    stage: "quoted",
+    selectionCount: 8,
+    selectionValue: 45000,
+    submittedAt: "2024-12-15",
+    lastContactedAt: "2024-12-20",
+    meetingDate: "2024-12-18",
+    quoteValue: 42500,
+    assignedTo: "Sarah",
+    priority: "high",
+  },
+  {
+    id: "2",
+    name: "Charlotte Wilson",
+    email: "c.wilson@business.com",
+    phone: "+44 7700 900321",
+    stage: "deposit_paid",
+    selectionCount: 12,
+    selectionValue: 67000,
+    submittedAt: "2024-12-10",
+    lastContactedAt: "2024-12-19",
+    meetingDate: "2024-12-12",
+    quoteValue: 64000,
+    depositPaid: 12800,
+    assignedTo: "Tom",
+    priority: "normal",
+  },
+  {
+    id: "3",
+    name: "Michael Brown",
+    email: "m.brown@company.co.uk",
+    phone: "+44 7700 900789",
+    stage: "submitted",
+    selectionCount: 5,
+    selectionValue: 28000,
+    submittedAt: "2024-12-21",
+    priority: "urgent",
+    notes: "Called earlier, very keen to proceed",
+  },
+  {
+    id: "4",
+    name: "Isabella Moore",
+    email: "isabella.m@email.co.uk",
+    stage: "contacted",
+    selectionCount: 4,
+    selectionValue: 19500,
+    submittedAt: "2024-12-18",
+    lastContactedAt: "2024-12-20",
+    assignedTo: "Sarah",
+    priority: "normal",
+  },
+  {
+    id: "5",
+    name: "Oliver Harris",
+    email: "oliver.h@email.com",
+    phone: "+44 7700 900555",
+    stage: "meeting_scheduled",
+    selectionCount: 6,
+    selectionValue: 32000,
+    submittedAt: "2024-12-14",
+    lastContactedAt: "2024-12-16",
+    meetingDate: "2024-12-23",
+    assignedTo: "Tom",
+    priority: "normal",
+  },
+  {
+    id: "6",
+    name: "Emily Watson",
+    email: "emily.w@gmail.com",
+    stage: "in_production",
+    selectionCount: 9,
+    selectionValue: 52000,
+    submittedAt: "2024-11-20",
+    lastContactedAt: "2024-12-15",
+    meetingDate: "2024-11-25",
+    quoteValue: 49500,
+    depositPaid: 9900,
+    productionPaid: 34650,
+    assignedTo: "Sarah",
+    priority: "normal",
+  },
+  {
+    id: "7",
+    name: "William Taylor",
+    email: "w.taylor@business.co.uk",
+    phone: "+44 7700 900666",
+    stage: "ready_delivery",
+    selectionCount: 7,
+    selectionValue: 38000,
+    submittedAt: "2024-11-01",
+    lastContactedAt: "2024-12-18",
+    meetingDate: "2024-11-05",
+    quoteValue: 36000,
+    depositPaid: 7200,
+    productionPaid: 25200,
+    assignedTo: "Tom",
+    priority: "high",
+    notes: "Delivery scheduled for Dec 28",
+  },
+  {
+    id: "8",
+    name: "Grace Anderson",
+    email: "grace.a@email.com",
+    stage: "completed",
+    selectionCount: 5,
+    selectionValue: 24000,
+    submittedAt: "2024-10-15",
+    lastContactedAt: "2024-12-01",
+    meetingDate: "2024-10-20",
+    quoteValue: 23000,
+    depositPaid: 4600,
+    productionPaid: 16100,
+    finalPaid: 2300,
+    assignedTo: "Sarah",
+    priority: "normal",
+  },
 ];
 
-function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
-  const statusInfo = LEAD_STATUS_INFO[lead.status];
-  const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.trim() || lead.profile.email;
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+const STAGE_INFO: Record<PipelineStage, { label: string; color: string; bgColor: string }> = {
+  submitted: { label: "New Submission", color: "text-purple-400", bgColor: "bg-purple-500/20" },
+  contacted: { label: "Contacted", color: "text-blue-400", bgColor: "bg-blue-500/20" },
+  meeting_scheduled: { label: "Meeting Scheduled", color: "text-cyan-400", bgColor: "bg-cyan-500/20" },
+  quoted: { label: "Quote Sent", color: "text-yellow-400", bgColor: "bg-yellow-500/20" },
+  deposit_paid: { label: "Deposit Paid", color: "text-green-400", bgColor: "bg-green-500/20" },
+  in_production: { label: "In Production", color: "text-orange-400", bgColor: "bg-orange-500/20" },
+  ready_delivery: { label: "Ready for Delivery", color: "text-pink-400", bgColor: "bg-pink-500/20" },
+  completed: { label: "Completed", color: "text-white/60", bgColor: "bg-white/10" },
+};
 
-  const paymentProgress = lead.selectionValue > 0 
-    ? Math.round((lead.totalPaid / lead.selectionValue) * 100) 
-    : 0;
+const PRIORITY_INFO: Record<string, { color: string }> = {
+  normal: { color: "border-white/10" },
+  high: { color: "border-yellow-500/50" },
+  urgent: { color: "border-red-500/50" },
+};
+
+// Helper functions
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function formatCurrency(value: number): string {
+  return `£${value.toLocaleString()}`;
+}
+
+function calculatePaymentProgress(client: PipelineClient): { paid: number; total: number; percentage: number } {
+  const total = client.quoteValue || client.selectionValue;
+  const paid = (client.depositPaid || 0) + (client.productionPaid || 0) + (client.finalPaid || 0);
+  return { paid, total, percentage: Math.round((paid / total) * 100) };
+}
+
+// Components
+function PipelineStats({ clients }: { clients: PipelineClient[] }) {
+  const stats = useMemo(() => {
+    const newSubmissions = clients.filter((c) => c.stage === "submitted").length;
+    const activeDeals = clients.filter((c) => !["completed", "submitted"].includes(c.stage)).length;
+    const totalPipelineValue = clients
+      .filter((c) => c.stage !== "completed")
+      .reduce((sum, c) => sum + (c.quoteValue || c.selectionValue), 0);
+    const completedThisMonth = clients.filter((c) => c.stage === "completed").length;
+
+    return { newSubmissions, activeDeals, totalPipelineValue, completedThisMonth };
+  }, [clients]);
 
   return (
-    <div
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+        <div className="flex items-center gap-2 text-purple-400 text-sm mb-1">
+          <AlertCircle className="w-4 h-4" />
+          New Submissions
+        </div>
+        <p className="text-2xl font-light text-white">{stats.newSubmissions}</p>
+      </div>
+      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+        <div className="flex items-center gap-2 text-white/60 text-sm mb-1">
+          <Users className="w-4 h-4" />
+          Active Deals
+        </div>
+        <p className="text-2xl font-light text-white">{stats.activeDeals}</p>
+      </div>
+      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+        <div className="flex items-center gap-2 text-white/60 text-sm mb-1">
+          <DollarSign className="w-4 h-4" />
+          Pipeline Value
+        </div>
+        <p className="text-2xl font-light text-white">{formatCurrency(stats.totalPipelineValue)}</p>
+      </div>
+      <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
+        <div className="flex items-center gap-2 text-green-400 text-sm mb-1">
+          <CheckCircle2 className="w-4 h-4" />
+          Completed
+        </div>
+        <p className="text-2xl font-light text-white">{stats.completedThisMonth}</p>
+      </div>
+    </div>
+  );
+}
+
+function ClientCard({
+  client,
+  onClick,
+}: {
+  client: PipelineClient;
+  onClick: () => void;
+}) {
+  const paymentProgress = calculatePaymentProgress(client);
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
       onClick={onClick}
-      className="bg-white/5 rounded-lg border border-white/10 p-4 hover:bg-white/10 transition-colors cursor-pointer group"
+      className={`bg-white/5 border ${PRIORITY_INFO[client.priority].color} rounded-lg p-4 cursor-pointer hover:bg-white/10 transition-colors`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white text-sm font-light">
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <h4 className="font-light text-white truncate">{name}</h4>
-            {lead.profile.company && (
-              <p className="text-xs text-white/40 font-light flex items-center gap-1">
-                <Building2 className="w-3 h-3" />
-                {lead.profile.company}
-              </p>
-            )}
-          </div>
-        </div>
-        <button 
-          onClick={(e) => { e.stopPropagation(); }}
-          className="p-1 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded transition-all"
-        >
-          <MoreHorizontal className="w-4 h-4 text-white/40" />
-        </button>
-      </div>
-
-      {/* Source Badge */}
-      <div className="mb-2">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-light ${LEAD_SOURCE_INFO[lead.source]?.color || "bg-white/10 text-white/50"}`}>
-          {LEAD_SOURCE_INFO[lead.source]?.label || lead.source}
-        </span>
-      </div>
-
-      {lead.selectionCount > 0 && (
-        <div className="flex items-center gap-2 mb-3 text-sm">
-          <Package className="w-3.5 h-3.5 text-white/40" />
-          <span className="text-white/60 font-light">
-            {lead.selectionCount} items • £{lead.selectionValue.toLocaleString()}
-          </span>
+      {/* Priority indicator */}
+      {client.priority !== "normal" && (
+        <div className={`text-xs mb-2 ${client.priority === "urgent" ? "text-red-400" : "text-yellow-400"}`}>
+          {client.priority === "urgent" ? "⚡ Urgent" : "⭐ High Priority"}
         </div>
       )}
 
-      {lead.submission && (
-        <div className="mb-3 px-2 py-1.5 bg-white/5 rounded text-xs font-light">
-          <span className="text-white/40">Ref:</span>{" "}
-          <span className="text-white/60">{lead.submission.submission_number}</span>
-        </div>
-      )}
+      {/* Name & Contact */}
+      <div className="mb-3">
+        <h3 className="font-light text-white">{client.name}</h3>
+        <p className="text-sm text-white/40">{client.email}</p>
+      </div>
 
-      {lead.totalPaid > 0 && (
+      {/* Selection Info */}
+      <div className="flex items-center justify-between text-sm mb-3">
+        <span className="text-white/60">{client.selectionCount} items</span>
+        <span className="text-white">{formatCurrency(client.quoteValue || client.selectionValue)}</span>
+      </div>
+
+      {/* Payment Progress (if applicable) */}
+      {client.depositPaid && (
         <div className="mb-3">
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-white/40 font-light">Payment Progress</span>
-            <span className="text-white/60 font-light">{paymentProgress}%</span>
+          <div className="flex items-center justify-between text-xs text-white/40 mb-1">
+            <span>Payment</span>
+            <span>{paymentProgress.percentage}%</span>
           </div>
           <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-white/60 rounded-full transition-all"
-              style={{ width: `${paymentProgress}%` }}
+            <div
+              className="h-full bg-green-500 rounded-full transition-all"
+              style={{ width: `${paymentProgress.percentage}%` }}
             />
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between text-xs text-white/30 font-light pt-2 border-t border-white/10">
-        <span className="flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          {new Date(lead.createdAt).toLocaleDateString("en-GB", { 
-            day: "numeric", 
-            month: "short" 
-          })}
-        </span>
-        {lead.nextFollowUp && (
-          <span className="flex items-center gap-1 text-white/50">
-            <Calendar className="w-3 h-3" />
-            Follow-up: {lead.nextFollowUp}
-          </span>
-        )}
+      {/* Assigned & Date */}
+      <div className="flex items-center justify-between text-xs text-white/40">
+        {client.assignedTo && <span>{client.assignedTo}</span>}
+        <span>{formatDate(client.submittedAt)}</span>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
-  const statusInfo = LEAD_STATUS_INFO[lead.status];
-  const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.trim() || lead.profile.email;
-
-  return (
-    <tr 
-      onClick={onClick}
-      className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
-    >
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white text-sm font-light">
-            {name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
-          </div>
-          <div>
-            <p className="font-light text-white">{name}</p>
-            <p className="text-sm text-white/40 font-light">{lead.profile.email}</p>
-          </div>
-        </div>
-      </td>
-      <td className="px-6 py-4">
-        {lead.profile.company && (
-          <p className="font-light text-white/60">{lead.profile.company}</p>
-        )}
-        {lead.profile.phone && (
-          <p className="text-sm text-white/40 font-light">{lead.profile.phone}</p>
-        )}
-      </td>
-      <td className="px-6 py-4">
-        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-light ${statusInfo.color}`}>
-          {statusInfo.label}
-        </span>
-      </td>
-      <td className="px-6 py-4">
-        <p className="font-light text-white">{lead.selectionCount} items</p>
-        {lead.selectionValue > 0 && (
-          <p className="text-sm text-white/40 font-light">
-            £{lead.selectionValue.toLocaleString()}
-          </p>
-        )}
-      </td>
-      <td className="px-6 py-4">
-        {lead.submission ? (
-          <span className="text-white/60 font-light">{lead.submission.submission_number}</span>
-        ) : (
-          <span className="text-white/30 font-light">-</span>
-        )}
-      </td>
-      <td className="px-6 py-4">
-        <p className="text-white/60 font-light">
-          {new Date(lead.createdAt).toLocaleDateString("en-GB")}
-        </p>
-      </td>
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-1">
-          <button 
-            onClick={(e) => { e.stopPropagation(); }}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            title="Call"
-          >
-            <Phone className="w-4 h-4 text-white/40" />
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); }}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            title="Email"
-          >
-            <Mail className="w-4 h-4 text-white/40" />
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); }}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <MoreHorizontal className="w-4 h-4 text-white/40" />
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-function PipelineColumn({ 
-  status, 
-  leads,
-  onLeadClick,
-}: { 
-  status: LeadStatus; 
-  leads: Lead[];
-  onLeadClick: (lead: Lead) => void;
+function KanbanColumn({
+  stage,
+  clients,
+  onClientClick,
+}: {
+  stage: PipelineStage;
+  clients: PipelineClient[];
+  onClientClick: (client: PipelineClient) => void;
 }) {
-  const statusInfo = LEAD_STATUS_INFO[status];
-  const totalValue = leads.reduce((sum, l) => sum + l.selectionValue, 0);
+  const stageInfo = STAGE_INFO[stage];
 
   return (
-    <div className="flex-shrink-0 w-72 bg-white/5 rounded-xl border border-white/10">
-      <div className="p-4 border-b border-white/10">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-light text-white text-sm">{statusInfo.label}</h3>
-            <span className="bg-white/10 text-white/60 text-xs font-light px-2 py-0.5 rounded-full">
-              {leads.length}
-            </span>
-          </div>
+    <div className="flex-shrink-0 w-80">
+      {/* Column Header */}
+      <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg ${stageInfo.bgColor}`}>
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-medium ${stageInfo.color}`}>{stageInfo.label}</span>
+          <span className="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded-full">
+            {clients.length}
+          </span>
         </div>
-        <p className="text-xs text-white/40 font-light">
-          £{totalValue.toLocaleString()} value
-        </p>
       </div>
 
-      <div className="p-2 space-y-2 min-h-[200px] max-h-[calc(100vh-380px)] overflow-y-auto">
-        {leads.map((lead) => (
-          <LeadCard 
-            key={lead.id} 
-            lead={lead} 
-            onClick={() => onLeadClick(lead)}
-          />
-        ))}
-        {leads.length === 0 && (
-          <div className="text-center py-8 text-white/20 font-light">
-            <p className="text-xs">No leads</p>
-          </div>
+      {/* Cards */}
+      <div className="bg-white/5 border border-white/10 border-t-0 rounded-b-lg p-3 min-h-[400px] space-y-3">
+        <AnimatePresence>
+          {clients.map((client) => (
+            <ClientCard key={client.id} client={client} onClick={() => onClientClick(client)} />
+          ))}
+        </AnimatePresence>
+        {clients.length === 0 && (
+          <div className="text-center py-8 text-white/30 text-sm">No clients</div>
         )}
       </div>
     </div>
   );
 }
 
-function LeadDetailPanel({ 
-  lead, 
-  onClose 
-}: { 
-  lead: Lead; 
+function ClientDetailPanel({
+  client,
+  onClose,
+  onStageChange,
+}: {
+  client: PipelineClient;
   onClose: () => void;
+  onStageChange: (clientId: string, newStage: PipelineStage) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"overview" | "selection" | "outreach" | "payments" | "notes">("overview");
-  const [showOutreachForm, setShowOutreachForm] = useState(false);
-  const [outreachType, setOutreachType] = useState<OutreachType>("call");
-  const [outreachOutcome, setOutreachOutcome] = useState<OutreachOutcome>("spoke");
-  const [outreachNotes, setOutreachNotes] = useState("");
-  const [followUpDate, setFollowUpDate] = useState("");
-  const statusInfo = LEAD_STATUS_INFO[lead.status];
-  const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.trim() || lead.profile.email;
+  const [activeTab, setActiveTab] = useState<"overview" | "payments" | "notes">("overview");
+  const paymentProgress = calculatePaymentProgress(client);
+  const stageInfo = STAGE_INFO[client.stage];
+
+  // Calculate payment milestones
+  const quoteValue = client.quoteValue || client.selectionValue;
+  const deposit20 = Math.round(quoteValue * 0.2);
+  const production70 = Math.round(quoteValue * 0.7);
+  const final10 = Math.round(quoteValue * 0.1);
+
+  // Get next stage
+  const stageOrder: PipelineStage[] = [
+    "submitted",
+    "contacted",
+    "meeting_scheduled",
+    "quoted",
+    "deposit_paid",
+    "in_production",
+    "ready_delivery",
+    "completed",
+  ];
+  const currentIndex = stageOrder.indexOf(client.stage);
+  const nextStage = currentIndex < stageOrder.length - 1 ? stageOrder[currentIndex + 1] : null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full max-w-xl bg-black border-l border-white/10 z-50 overflow-y-auto">
-      <div className="sticky top-0 bg-black border-b border-white/10 p-4 flex items-center justify-between">
-        <h2 className="text-lg font-light text-white">{name}</h2>
-        <button 
-          onClick={onClose}
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-        >
-          <ArrowRight className="w-5 h-5 text-white/40" />
-        </button>
-      </div>
-
-      {/* Status Badge */}
-      <div className="p-4 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <span className={`px-3 py-1.5 rounded-full text-sm font-light ${statusInfo.color}`}>
-            {statusInfo.label}
-          </span>
-          <span className="text-white/40 font-light text-sm">{statusInfo.description}</span>
+    <motion.div
+      initial={{ x: "100%" }}
+      animate={{ x: 0 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", damping: 25 }}
+      className="fixed right-0 top-0 h-full w-full max-w-lg bg-black border-l border-white/10 z-50 overflow-y-auto"
+    >
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`text-xs px-2 py-1 rounded-full ${stageInfo.bgColor} ${stageInfo.color}`}>
+                {stageInfo.label}
+              </span>
+              {client.priority !== "normal" && (
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  client.priority === "urgent" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"
+                }`}>
+                  {client.priority === "urgent" ? "Urgent" : "High Priority"}
+                </span>
+              )}
+            </div>
+            <h2 className="text-xl font-light text-white">{client.name}</h2>
+            <p className="text-white/40">{client.email}</p>
+            {client.phone && <p className="text-white/40 text-sm">{client.phone}</p>}
+          </div>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-white/40">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="p-4 border-b border-white/10 flex gap-2">
-        <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-white/60 font-light text-sm">
-          <Phone className="w-4 h-4" />
-          Call
-        </button>
-        <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-white/60 font-light text-sm">
-          <Mail className="w-4 h-4" />
-          Email
-        </button>
-        <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-white/60 font-light text-sm">
-          <Send className="w-4 h-4" />
-          Quote
-        </button>
-      </div>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-4 gap-2 mb-6">
+          <button className="flex flex-col items-center gap-1 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+            <Phone className="w-5 h-5 text-white/60" />
+            <span className="text-xs text-white/60">Call</span>
+          </button>
+          <button className="flex flex-col items-center gap-1 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+            <Mail className="w-5 h-5 text-white/60" />
+            <span className="text-xs text-white/60">Email</span>
+          </button>
+          <button className="flex flex-col items-center gap-1 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+            <Calendar className="w-5 h-5 text-white/60" />
+            <span className="text-xs text-white/60">Meeting</span>
+          </button>
+          <button className="flex flex-col items-center gap-1 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+            <FileText className="w-5 h-5 text-white/60" />
+            <span className="text-xs text-white/60">Quote</span>
+          </button>
+        </div>
 
-      {/* Tabs */}
-      <div className="border-b border-white/10">
-        <div className="flex">
-          {(["overview", "selection", "outreach", "payments", "notes"] as const).map((tab) => (
+        {/* Move to Next Stage */}
+        {nextStage && (
+          <button
+            onClick={() => onStageChange(client.id, nextStage)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white text-black rounded-lg hover:bg-white/90 transition-colors mb-6"
+          >
+            Move to {STAGE_INFO[nextStage].label}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 border-b border-white/10">
+          {(["overview", "payments", "notes"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 px-4 py-3 text-sm font-light transition-colors ${
+              className={`px-4 py-2 text-sm capitalize ${
                 activeTab === tab
                   ? "text-white border-b-2 border-white"
                   : "text-white/40 hover:text-white/60"
               }`}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              {tab === "outreach" && lead.outreach.totalOutreachCount > 0 && (
-                <span className="ml-1 text-xs text-white/40">({lead.outreach.totalOutreachCount})</span>
-              )}
+              {tab}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Tab Content */}
-      <div className="p-4">
+        {/* Tab Content */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            {/* Contact Info */}
-            <div>
-              <h3 className="text-sm font-light text-white/40 mb-3">Contact Information</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-white/40" />
-                  <span className="text-white/80 font-light">{lead.profile.email}</span>
+            {/* Selection Summary */}
+            <div className="bg-white/5 rounded-lg p-4">
+              <h3 className="text-sm text-white/40 mb-3">Selection Summary</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-2xl font-light text-white">{client.selectionCount} items</p>
+                  <p className="text-white/60">{formatCurrency(client.selectionValue)} total value</p>
                 </div>
-                {lead.profile.phone && (
-                  <div className="flex items-center gap-3">
-                    <Phone className="w-4 h-4 text-white/40" />
-                    <span className="text-white/80 font-light">{lead.profile.phone}</span>
-                  </div>
-                )}
-                {lead.profile.company && (
-                  <div className="flex items-center gap-3">
-                    <Building2 className="w-4 h-4 text-white/40" />
-                    <span className="text-white/80 font-light">{lead.profile.company}</span>
-                  </div>
-                )}
+                <Package className="w-8 h-8 text-white/20" />
               </div>
             </div>
-
-            {/* Address */}
-            {lead.profile.address_line_1 && (
-              <div>
-                <h3 className="text-sm font-light text-white/40 mb-3">Address</h3>
-                <p className="text-white/80 font-light">
-                  {lead.profile.address_line_1}
-                  {lead.profile.address_line_2 && <>, {lead.profile.address_line_2}</>}
-                  <br />
-                  {lead.profile.city}, {lead.profile.postcode}
-                  <br />
-                  {lead.profile.country}
-                </p>
-              </div>
-            )}
-
-            {/* Submission Info */}
-            {lead.submission && (
-              <div>
-                <h3 className="text-sm font-light text-white/40 mb-3">Submission</h3>
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white font-light">{lead.submission.submission_number}</span>
-                    <span className="text-white/60 font-light text-sm">
-                      {new Date(lead.submission.submitted_at).toLocaleDateString("en-GB")}
-                    </span>
-                  </div>
-                  {lead.submission.notes && (
-                    <p className="text-white/60 font-light text-sm">{lead.submission.notes}</p>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* Timeline */}
             <div>
-              <h3 className="text-sm font-light text-white/40 mb-3">Timeline</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-white/40 font-light">Registered</span>
-                  <span className="text-white/60 font-light">
-                    {new Date(lead.createdAt).toLocaleDateString("en-GB")}
-                  </span>
+              <h3 className="text-sm text-white/40 mb-3">Timeline</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-white/60" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-white">Submitted</p>
+                    <p className="text-xs text-white/40">{formatDate(client.submittedAt)}</p>
+                  </div>
                 </div>
-                {lead.lastContactedAt && (
-                  <div className="flex justify-between">
-                    <span className="text-white/40 font-light">Last Contacted</span>
-                    <span className="text-white/60 font-light">
-                      {new Date(lead.lastContactedAt).toLocaleDateString("en-GB")}
-                    </span>
+                {client.lastContactedAt && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                      <Phone className="w-4 h-4 text-white/60" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-white">Last Contacted</p>
+                      <p className="text-xs text-white/40">{formatDate(client.lastContactedAt)}</p>
+                    </div>
                   </div>
                 )}
-                {lead.meetingScheduledAt && (
-                  <div className="flex justify-between">
-                    <span className="text-white/40 font-light">Meeting</span>
-                    <span className="text-white/60 font-light">
-                      {new Date(lead.meetingScheduledAt).toLocaleDateString("en-GB")}
-                    </span>
-                  </div>
-                )}
-                {lead.nextFollowUp && (
-                  <div className="flex justify-between">
-                    <span className="text-white/40 font-light">Next Follow-up</span>
-                    <span className="text-white font-light">{lead.nextFollowUp}</span>
+                {client.meetingDate && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                      <Calendar className="w-4 h-4 text-white/60" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-white">Meeting</p>
+                      <p className="text-xs text-white/40">{formatDate(client.meetingDate)}</p>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
-          </div>
-        )}
 
-        {activeTab === "selection" && (
-          <div className="space-y-4">
-            {lead.selectionItems.length > 0 ? (
-              <>
-                <div className="flex justify-between items-center">
-                  <span className="text-white/40 font-light text-sm">
-                    {lead.selectionCount} items selected
-                  </span>
-                  <span className="text-white font-light">
-                    £{lead.selectionValue.toLocaleString()}
-                  </span>
-                </div>
-                {lead.selectionItems.map((item) => (
-                  <div 
-                    key={item.id}
-                    className="bg-white/5 rounded-lg p-4 border border-white/10"
-                  >
-                    <div className="flex justify-between mb-1">
-                      <span className="text-white font-light">{item.product_name}</span>
-                      <span className="text-white/60 font-light">
-                        £{((item.unit_price || 0) * item.quantity).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-white/40 font-light">
-                      {item.product_category && <span>{item.product_category}</span>}
-                      {item.colour && <span>• {item.colour}</span>}
-                      <span>• Qty: {item.quantity}</span>
-                    </div>
-                    {item.notes && (
-                      <p className="text-sm text-white/40 font-light mt-2 italic">
-                        "{item.notes}"
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </>
-            ) : (
-              <div className="text-center py-8 text-white/30 font-light">
-                <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No items selected yet</p>
+            {/* Assigned To */}
+            {client.assignedTo && (
+              <div className="bg-white/5 rounded-lg p-4">
+                <p className="text-xs text-white/40 mb-1">Assigned To</p>
+                <p className="text-white">{client.assignedTo}</p>
               </div>
             )}
-          </div>
-        )}
-
-        {activeTab === "outreach" && (
-          <div className="space-y-6">
-            {/* Nurturing Status */}
-            <div>
-              <h3 className="text-sm font-light text-white/40 mb-3">Nurturing Status</h3>
-              <div className="flex gap-2">
-                {(Object.keys(NURTURING_STATUS_INFO) as NurturingStatus[]).map((status) => {
-                  const info = NURTURING_STATUS_INFO[status];
-                  const isActive = lead.outreach.nurturingStatus === status;
-                  return (
-                    <button
-                      key={status}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-light transition-colors ${
-                        isActive
-                          ? "bg-white text-black"
-                          : "bg-white/5 text-white/60 hover:bg-white/10"
-                      }`}
-                    >
-                      {info.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Outreach Summary */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                <p className="text-white/40 font-light text-sm mb-1">Total Outreach</p>
-                <p className="text-2xl font-light text-white">
-                  {lead.outreach.totalOutreachCount}
-                </p>
-              </div>
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                <p className="text-white/40 font-light text-sm mb-1">Last Contact</p>
-                <p className="text-lg font-light text-white">
-                  {lead.outreach.lastOutreachAt 
-                    ? new Date(lead.outreach.lastOutreachAt).toLocaleDateString("en-GB")
-                    : "Never"
-                  }
-                </p>
-              </div>
-            </div>
-
-            {/* Next Follow-up */}
-            {lead.outreach.nextFollowUpAt && (
-              <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-white font-light">Next Follow-up</p>
-                    <p className="text-white/60 font-light text-sm">
-                      {new Date(lead.outreach.nextFollowUpAt).toLocaleDateString("en-GB", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                      })}
-                    </p>
-                  </div>
-                  <Calendar className="w-5 h-5 text-white/40" />
-                </div>
-              </div>
-            )}
-
-            {/* Log New Outreach */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-light text-white/40">Log Outreach</h3>
-                <button
-                  onClick={() => setShowOutreachForm(!showOutreachForm)}
-                  className="text-sm text-white/60 hover:text-white font-light"
-                >
-                  {showOutreachForm ? "Cancel" : "+ Add"}
-                </button>
-              </div>
-
-              {showOutreachForm && (
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-4">
-                  <div>
-                    <label className="block text-sm text-white/40 font-light mb-2">Type</label>
-                    <div className="flex gap-2 flex-wrap">
-                      {(Object.keys(OUTREACH_TYPE_INFO) as OutreachType[]).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setOutreachType(type)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-light transition-colors ${
-                            outreachType === type
-                              ? "bg-white text-black"
-                              : "bg-white/5 text-white/60 hover:bg-white/10"
-                          }`}
-                        >
-                          {OUTREACH_TYPE_INFO[type].label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-white/40 font-light mb-2">Outcome</label>
-                    <select
-                      value={outreachOutcome}
-                      onChange={(e) => setOutreachOutcome(e.target.value as OutreachOutcome)}
-                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-light focus:outline-none focus:ring-1 focus:ring-white/30"
-                    >
-                      {(Object.keys(OUTREACH_OUTCOME_INFO) as OutreachOutcome[]).map((outcome) => (
-                        <option key={outcome} value={outcome}>
-                          {OUTREACH_OUTCOME_INFO[outcome].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-white/40 font-light mb-2">Notes</label>
-                    <textarea
-                      value={outreachNotes}
-                      onChange={(e) => setOutreachNotes(e.target.value)}
-                      placeholder="What was discussed..."
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30 resize-none"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-white/40 font-light mb-2">Schedule Follow-up</label>
-                    <input
-                      type="date"
-                      value={followUpDate}
-                      onChange={(e) => setFollowUpDate(e.target.value)}
-                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-light focus:outline-none focus:ring-1 focus:ring-white/30"
-                    />
-                  </div>
-
-                  <button className="w-full py-2 bg-white text-black rounded-lg font-light hover:bg-white/90 transition-colors">
-                    Log Outreach
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Outreach History */}
-            <div>
-              <h3 className="text-sm font-light text-white/40 mb-3">Outreach History</h3>
-              {lead.outreach.outreachHistory.length > 0 ? (
-                <div className="space-y-3">
-                  {lead.outreach.outreachHistory.map((record) => (
-                    <div 
-                      key={record.id}
-                      className="bg-white/5 rounded-lg p-4 border border-white/10"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded text-xs font-light ${
-                            OUTREACH_OUTCOME_INFO[record.outcome].color
-                          }`}>
-                            {OUTREACH_OUTCOME_INFO[record.outcome].label}
-                          </span>
-                          <span className="text-white/40 text-xs font-light">
-                            via {OUTREACH_TYPE_INFO[record.type].label}
-                          </span>
-                        </div>
-                        <span className="text-white/40 text-xs font-light">
-                          {new Date(record.createdAt).toLocaleDateString("en-GB")}
-                        </span>
-                      </div>
-                      {record.notes && (
-                        <p className="text-white/60 font-light text-sm">{record.notes}</p>
-                      )}
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
-                        <span className="text-white/30 text-xs font-light">
-                          by {record.createdByName}
-                        </span>
-                        {record.followUpDate && (
-                          <span className="text-white/40 text-xs font-light flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            Follow-up: {record.followUpDate}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-white/30 font-light">
-                  <Phone className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No outreach recorded yet</p>
-                  <p className="text-sm mt-1">Log your first contact above</p>
-                </div>
-              )}
-            </div>
           </div>
         )}
 
         {activeTab === "payments" && (
           <div className="space-y-6">
-            {/* Payment Summary */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                <p className="text-white/40 font-light text-sm mb-1">Total Value</p>
-                <p className="text-2xl font-light text-white">
-                  £{lead.selectionValue.toLocaleString()}
-                </p>
+            {/* Payment Progress */}
+            <div className="bg-white/5 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm text-white/40">Payment Progress</h3>
+                <span className="text-white font-light">
+                  {formatCurrency(paymentProgress.paid)} / {formatCurrency(paymentProgress.total)}
+                </span>
               </div>
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                <p className="text-white/40 font-light text-sm mb-1">Amount Paid</p>
-                <p className="text-2xl font-light text-white">
-                  £{lead.totalPaid.toLocaleString()}
-                </p>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-2">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all"
+                  style={{ width: `${paymentProgress.percentage}%` }}
+                />
               </div>
+              <p className="text-right text-sm text-white/40">{paymentProgress.percentage}% paid</p>
             </div>
 
-            {/* Payment Stages */}
-            <div>
-              <h3 className="text-sm font-light text-white/40 mb-3">Payment Schedule</h3>
-              <div className="space-y-3">
-                {(["deposit", "production", "delivery"] as const).map((stage) => {
-                  const stageInfo = PAYMENT_STAGES[stage];
-                  const payment = lead.payments.find((p) => p.type === stage);
-                  const amount = Math.round(lead.selectionValue * (stageInfo.percentage / 100));
-                  
-                  return (
-                    <div 
-                      key={stage}
-                      className="bg-white/5 rounded-lg p-4 border border-white/10"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="text-white font-light">{stageInfo.label}</span>
-                          <span className="text-white/40 font-light text-sm ml-2">
-                            ({stageInfo.percentage}%)
-                          </span>
-                        </div>
-                        <span className="text-white font-light">
-                          £{amount.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/40 font-light text-sm">
-                          {stageInfo.description}
-                        </span>
-                        {payment?.status === "paid" ? (
-                          <span className="px-2 py-0.5 bg-white text-black rounded text-xs font-light">
-                            Paid
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-white/10 text-white/60 rounded text-xs font-light">
-                            Pending
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Payment History */}
-            {lead.payments.length > 0 && (
-              <div>
-                <h3 className="text-sm font-light text-white/40 mb-3">Payment History</h3>
-                <div className="space-y-2">
-                  {lead.payments.map((payment) => (
-                    <div 
-                      key={payment.id}
-                      className="flex items-center justify-between py-2 border-b border-white/5"
-                    >
-                      <div>
-                        <p className="text-white font-light text-sm">{payment.reference}</p>
-                        <p className="text-white/40 font-light text-xs">
-                          {payment.paidAt && new Date(payment.paidAt).toLocaleDateString("en-GB")}
-                        </p>
-                      </div>
-                      <span className="text-white font-light">
-                        £{payment.amount.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
+            {/* Payment Milestones */}
+            <div className="space-y-3">
+              {/* Deposit */}
+              <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                client.depositPaid ? "bg-green-500/10 border-green-500/20" : "bg-white/5 border-white/10"
+              }`}>
+                <div className="flex items-center gap-3">
+                  {client.depositPaid ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-400" />
+                  ) : (
+                    <Clock className="w-5 h-5 text-white/40" />
+                  )}
+                  <div>
+                    <p className="text-sm text-white">20% Deposit</p>
+                    <p className="text-xs text-white/40">{formatCurrency(deposit20)}</p>
+                  </div>
                 </div>
+                {client.depositPaid && (
+                  <span className="text-sm text-green-400">{formatCurrency(client.depositPaid)}</span>
+                )}
               </div>
-            )}
+
+              {/* Production */}
+              <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                client.productionPaid ? "bg-green-500/10 border-green-500/20" : "bg-white/5 border-white/10"
+              }`}>
+                <div className="flex items-center gap-3">
+                  {client.productionPaid ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-400" />
+                  ) : (
+                    <Clock className="w-5 h-5 text-white/40" />
+                  )}
+                  <div>
+                    <p className="text-sm text-white">70% Production</p>
+                    <p className="text-xs text-white/40">{formatCurrency(production70)}</p>
+                  </div>
+                </div>
+                {client.productionPaid && (
+                  <span className="text-sm text-green-400">{formatCurrency(client.productionPaid)}</span>
+                )}
+              </div>
+
+              {/* Final */}
+              <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                client.finalPaid ? "bg-green-500/10 border-green-500/20" : "bg-white/5 border-white/10"
+              }`}>
+                <div className="flex items-center gap-3">
+                  {client.finalPaid ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-400" />
+                  ) : (
+                    <Clock className="w-5 h-5 text-white/40" />
+                  )}
+                  <div>
+                    <p className="text-sm text-white">10% Delivery</p>
+                    <p className="text-xs text-white/40">{formatCurrency(final10)}</p>
+                  </div>
+                </div>
+                {client.finalPaid && (
+                  <span className="text-sm text-green-400">{formatCurrency(client.finalPaid)}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Record Payment Button */}
+            <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 transition-colors">
+              <CreditCard className="w-4 h-4" />
+              Record Payment
+            </button>
           </div>
         )}
 
         {activeTab === "notes" && (
           <div className="space-y-4">
-            {/* Add Note */}
-            <div>
-              <textarea
-                placeholder="Add a note..."
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30 resize-none"
-                rows={3}
-              />
-              <div className="flex justify-end mt-2">
-                <button className="px-4 py-2 bg-white text-black rounded-lg font-light text-sm hover:bg-white/90 transition-colors">
-                  Add Note
-                </button>
-              </div>
-            </div>
-
-            {/* Notes List */}
-            {lead.notes.length > 0 ? (
-              <div className="space-y-3">
-                {lead.notes.map((note) => (
-                  <div 
-                    key={note.id}
-                    className={`bg-white/5 rounded-lg p-4 border ${
-                      note.isPinned ? "border-white/30" : "border-white/10"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-white/60 font-light text-sm">{note.authorName}</span>
-                      <span className="text-white/40 font-light text-xs">
-                        {new Date(note.createdAt).toLocaleDateString("en-GB")}
-                      </span>
-                    </div>
-                    <p className="text-white/80 font-light text-sm">{note.content}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-white/30 font-light">
-                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No notes yet</p>
+            {client.notes && (
+              <div className="bg-white/5 rounded-lg p-4">
+                <p className="text-sm text-white/80 font-light">{client.notes}</p>
+                <p className="text-xs text-white/40 mt-2">Initial note</p>
               </div>
             )}
+            <textarea
+              placeholder="Add a note..."
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-light text-sm focus:outline-none focus:ring-1 focus:ring-white/30 resize-none"
+              rows={4}
+            />
+            <button className="px-4 py-2 bg-white text-black rounded-lg text-sm hover:bg-white/90 transition-colors">
+              Save Note
+            </button>
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-export default function ClientsPage() {
-  const [viewMode, setViewMode] = useState<"pipeline" | "list">("pipeline");
+// Main Page
+export default function ClientPipelinePage() {
+  const [clients, setClients] = useState<PipelineClient[]>(MOCK_PIPELINE_CLIENTS);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
-  const [sourceFilter, setSourceFilter] = useState<LeadSource | "all">("all");
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [showAddClient, setShowAddClient] = useState(false);
-  const [showSourceStats, setShowSourceStats] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<PipelineClient | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
 
-  // Use mock data for now
-  const leads = getMockLeads();
-  const stats = getMockLeadStats();
-  const sourceStats = getMockSourceStats();
-  const newsletterSubscribers = getMockNewsletterSubscribers();
+  // Get unique assignees
+  const assignees = useMemo(() => {
+    const unique = new Set(clients.map((c) => c.assignedTo).filter(Boolean));
+    return Array.from(unique) as string[];
+  }, [clients]);
 
-  const handleAddClient = (data: ClientFormData) => {
-    console.log("New client:", data);
-    // TODO: Add to Supabase
-    setShowAddClient(false);
-  };
-
-  const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.toLowerCase();
-      const matchesSearch =
-        searchQuery === "" ||
-        name.includes(searchQuery.toLowerCase()) ||
-        lead.profile.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lead.profile.company?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus =
-        statusFilter === "all" || lead.status === statusFilter;
-
-      const matchesSource =
-        sourceFilter === "all" || lead.source === sourceFilter;
-
-      return matchesSearch && matchesStatus && matchesSource;
+  // Filter clients
+  const filteredClients = useMemo(() => {
+    return clients.filter((client) => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        if (
+          !client.name.toLowerCase().includes(query) &&
+          !client.email.toLowerCase().includes(query)
+        ) {
+          return false;
+        }
+      }
+      if (assigneeFilter !== "all" && client.assignedTo !== assigneeFilter) {
+        return false;
+      }
+      return true;
     });
-  }, [leads, searchQuery, statusFilter, sourceFilter]);
+  }, [clients, searchQuery, assigneeFilter]);
 
-  const leadsByStatus = useMemo(() => {
-    return PIPELINE_STAGES.reduce((acc, status) => {
-      acc[status] = filteredLeads.filter((l) => l.status === status);
+  // Group by stage
+  const clientsByStage = useMemo(() => {
+    const stages: PipelineStage[] = [
+      "submitted",
+      "contacted",
+      "meeting_scheduled",
+      "quoted",
+      "deposit_paid",
+      "in_production",
+      "ready_delivery",
+      "completed",
+    ];
+    return stages.reduce((acc, stage) => {
+      acc[stage] = filteredClients.filter((c) => c.stage === stage);
       return acc;
-    }, {} as Record<LeadStatus, Lead[]>);
-  }, [filteredLeads]);
+    }, {} as Record<PipelineStage, PipelineClient[]>);
+  }, [filteredClients]);
+
+  // Handle stage change
+  const handleStageChange = (clientId: string, newStage: PipelineStage) => {
+    setClients((prev) =>
+      prev.map((c) => (c.id === clientId ? { ...c, stage: newStage } : c))
+    );
+    // Update selected client if it's the one being changed
+    setSelectedClient((prev) =>
+      prev?.id === clientId ? { ...prev, stage: newStage } : prev
+    );
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-light text-white">Lead Management</h1>
-          <p className="text-white/40 mt-1 font-light">
-            {stats.total} leads • £{stats.totalPipelineValue.toLocaleString()} pipeline value
-          </p>
+          <h1 className="text-2xl font-light text-white">Client Pipeline</h1>
+          <p className="text-white/40">Manage clients who have submitted selections</p>
         </div>
-        <button 
-          onClick={() => setShowAddClient(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light"
+        <a
+          href="/dashboard/leads"
+          className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
         >
-          <Plus className="w-4 h-4" />
-          Add Lead
-        </button>
+          <Users className="w-4 h-4" />
+          View All Leads
+        </a>
       </div>
 
-      {/* Source Stats Toggle */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => setShowSourceStats(!showSourceStats)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-light transition-colors ${
-            showSourceStats 
-              ? "bg-white text-black" 
-              : "bg-white/5 text-white/60 border border-white/10 hover:bg-white/10"
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          Lead Sources
-          <ChevronDown className={`w-4 h-4 transition-transform ${showSourceStats ? "rotate-180" : ""}`} />
-        </button>
-        <span className="text-sm text-white/40 font-light">
-          {stats.newsletterSubscribers} newsletter subscribers • {stats.newsletterConversionRate.toFixed(0)}% converted to accounts
-        </span>
-      </div>
+      {/* Stats */}
+      <PipelineStats clients={clients} />
 
-      {/* Source Stats Panel */}
-      {showSourceStats && (
-        <div className="bg-white/5 rounded-xl border border-white/10 p-5">
-          <h3 className="text-sm font-light text-white/60 mb-4">Lead Sources Breakdown</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {sourceStats.map((stat) => (
-              <button
-                key={stat.source}
-                onClick={() => setSourceFilter(sourceFilter === stat.source ? "all" : stat.source)}
-                className={`p-4 rounded-lg border transition-all text-left ${
-                  sourceFilter === stat.source
-                    ? "bg-white text-black border-white"
-                    : "bg-white/5 border-white/10 hover:bg-white/10"
-                }`}
-              >
-                <p className={`text-2xl font-light ${sourceFilter === stat.source ? "text-black" : "text-white"}`}>
-                  {stat.count}
-                </p>
-                <p className={`text-sm font-light ${sourceFilter === stat.source ? "text-black/60" : "text-white/60"}`}>
-                  {LEAD_SOURCE_INFO[stat.source]?.label || stat.source}
-                </p>
-                <p className={`text-xs font-light mt-1 ${sourceFilter === stat.source ? "text-black/40" : "text-white/40"}`}>
-                  {stat.conversionRate.toFixed(0)}% converted • £{stat.totalValue.toLocaleString()}
-                </p>
-              </button>
-            ))}
-          </div>
-          
-          {/* Newsletter Subscribers Preview */}
-          <div className="mt-6 pt-4 border-t border-white/10">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-light text-white/60">Newsletter Only (Not Registered)</h4>
-              <span className="text-xs text-white/40 font-light">
-                {newsletterSubscribers.filter(s => !s.convertedToAccount).length} subscribers
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {newsletterSubscribers
-                .filter(s => !s.convertedToAccount)
-                .slice(0, 5)
-                .map(sub => (
-                  <span
-                    key={sub.id}
-                    className="px-3 py-1.5 bg-white/5 rounded-lg text-sm text-white/60 font-light"
-                  >
-                    {sub.email}
-                    {sub.utmSource && (
-                      <span className="text-white/30 ml-2">via {sub.utmSource}</span>
-                    )}
-                  </span>
-                ))}
-              {newsletterSubscribers.filter(s => !s.convertedToAccount).length > 5 && (
-                <span className="px-3 py-1.5 text-sm text-white/40 font-light">
-                  +{newsletterSubscribers.filter(s => !s.convertedToAccount).length - 5} more
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="w-5 h-5 text-white/40" />
-            <div>
-              <p className="text-lg font-light text-white">{stats.newThisWeek}</p>
-              <p className="text-xs text-white/40 font-light">New This Week</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="flex items-center gap-3">
-            <Package className="w-5 h-5 text-white/40" />
-            <div>
-              <p className="text-lg font-light text-white">{stats.byStatus.submitted || 0}</p>
-              <p className="text-xs text-white/40 font-light">Awaiting Review</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-white/40" />
-            <div>
-              <p className="text-lg font-light text-white">{stats.byStatus.meeting_scheduled || 0}</p>
-              <p className="text-xs text-white/40 font-light">Meetings Scheduled</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="flex items-center gap-3">
-            <DollarSign className="w-5 h-5 text-white/40" />
-            <div>
-              <p className="text-lg font-light text-white">
-                £{Math.round(stats.avgSelectionValue).toLocaleString()}
-              </p>
-              <p className="text-xs text-white/40 font-light">Avg Selection Value</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      {/* Search & Filters */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
             type="text"
-            placeholder="Search leads..."
+            placeholder="Search clients..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30"
+            className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-light focus:outline-none focus:ring-1 focus:ring-white/30"
           />
         </div>
-
         <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as LeadStatus | "all")}
-          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 font-light focus:outline-none focus:ring-1 focus:ring-white/30"
+          value={assigneeFilter}
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-light focus:outline-none"
         >
-          <option value="all">All Statuses</option>
-          {Object.entries(LEAD_STATUS_INFO).map(([status, info]) => (
-            <option key={status} value={status}>
-              {info.label}
+          <option value="all">All Assignees</option>
+          {assignees.map((assignee) => (
+            <option key={assignee} value={assignee}>
+              {assignee}
             </option>
           ))}
         </select>
-
-        <select
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value as LeadSource | "all")}
-          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 font-light focus:outline-none focus:ring-1 focus:ring-white/30"
-        >
-          <option value="all">All Sources</option>
-          {Object.entries(LEAD_SOURCE_INFO).map(([source, info]) => (
-            <option key={source} value={source}>
-              {info.label}
-            </option>
-          ))}
-        </select>
-
-        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
-          <button
-            onClick={() => setViewMode("pipeline")}
-            className={`px-4 py-1.5 rounded-md text-sm font-light transition-colors ${
-              viewMode === "pipeline"
-                ? "bg-white text-black"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            Pipeline
-          </button>
-          <button
-            onClick={() => setViewMode("list")}
-            className={`px-4 py-1.5 rounded-md text-sm font-light transition-colors ${
-              viewMode === "list"
-                ? "bg-white text-black"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            List
-          </button>
-        </div>
       </div>
 
-      {/* Content */}
-      {viewMode === "pipeline" ? (
-        <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
-          {PIPELINE_STAGES.map((status) => (
-            <PipelineColumn
-              key={status}
-              status={status}
-              leads={leadsByStatus[status] || []}
-              onLeadClick={setSelectedLead}
+      {/* Kanban Board */}
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-4 min-w-max">
+          {(Object.keys(clientsByStage) as PipelineStage[]).map((stage) => (
+            <KanbanColumn
+              key={stage}
+              stage={stage}
+              clients={clientsByStage[stage]}
+              onClientClick={setSelectedClient}
             />
           ))}
         </div>
-      ) : (
-        <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10 text-left">
-                  <th className="px-6 py-4 font-light text-white/60 text-sm">Contact</th>
-                  <th className="px-6 py-4 font-light text-white/60 text-sm">Company</th>
-                  <th className="px-6 py-4 font-light text-white/60 text-sm">Status</th>
-                  <th className="px-6 py-4 font-light text-white/60 text-sm">Selection</th>
-                  <th className="px-6 py-4 font-light text-white/60 text-sm">Reference</th>
-                  <th className="px-6 py-4 font-light text-white/60 text-sm">Created</th>
-                  <th className="px-6 py-4 font-light text-white/60 text-sm w-32"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLeads.map((lead) => (
-                  <LeadRow 
-                    key={lead.id} 
-                    lead={lead} 
-                    onClick={() => setSelectedLead(lead)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+      </div>
 
-          {filteredLeads.length === 0 && (
-            <div className="text-center py-12 text-white/40 font-light">
-              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No leads found</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Lead Detail Panel */}
-      {selectedLead && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setSelectedLead(null)}
-          />
-          <LeadDetailPanel
-            lead={selectedLead}
-            onClose={() => setSelectedLead(null)}
-          />
-        </>
-      )}
-
-      {/* Add Client Modal */}
-      <Modal
-        isOpen={showAddClient}
-        onClose={() => setShowAddClient(false)}
-        title="Add New Lead"
-        subtitle="Create a new client profile"
-        size="lg"
-      >
-        <AddClientForm
-          onSubmit={handleAddClient}
-          onCancel={() => setShowAddClient(false)}
-        />
-      </Modal>
+      {/* Client Detail Panel */}
+      <AnimatePresence>
+        {selectedClient && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-40"
+              onClick={() => setSelectedClient(null)}
+            />
+            <ClientDetailPanel
+              client={selectedClient}
+              onClose={() => setSelectedClient(null)}
+              onStageChange={handleStageChange}
+            />
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
