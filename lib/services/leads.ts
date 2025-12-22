@@ -240,13 +240,14 @@ export async function updateLeadStatus(
     .eq("client_id", leadId)
     .single();
   
-  const updateData = {
+  const updateData: Record<string, unknown> = {
     status,
-    priority: additionalData?.priority,
-    assigned_to: additionalData?.assignedTo,
-    next_follow_up: additionalData?.nextFollowUp,
     updated_at: new Date().toISOString(),
   };
+  
+  if (additionalData?.priority) updateData.priority = additionalData.priority;
+  if (additionalData?.assignedTo) updateData.assigned_to = additionalData.assignedTo;
+  if (additionalData?.nextFollowUp) updateData.next_follow_up = additionalData.nextFollowUp;
   
   if (existing) {
     const { error } = await supabase
@@ -260,8 +261,8 @@ export async function updateLeadStatus(
       .from("client_pipeline")
       .insert({
         client_id: leadId,
-        ...updateData,
         created_at: new Date().toISOString(),
+        ...updateData,
       });
     
     return !error;
