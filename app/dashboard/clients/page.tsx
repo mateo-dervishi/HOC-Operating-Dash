@@ -27,6 +27,12 @@ import {
   LeadStatus, 
   LEAD_STATUS_INFO,
   PAYMENT_STAGES,
+  OUTREACH_TYPE_INFO,
+  OUTREACH_OUTCOME_INFO,
+  NURTURING_STATUS_INFO,
+  OutreachType,
+  OutreachOutcome,
+  NurturingStatus,
 } from "@/types/leads";
 import { getMockLeads, getMockLeadStats } from "@/lib/services/leads";
 
@@ -268,7 +274,12 @@ function LeadDetailPanel({
   lead: Lead; 
   onClose: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"overview" | "selection" | "payments" | "notes">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "selection" | "outreach" | "payments" | "notes">("overview");
+  const [showOutreachForm, setShowOutreachForm] = useState(false);
+  const [outreachType, setOutreachType] = useState<OutreachType>("call");
+  const [outreachOutcome, setOutreachOutcome] = useState<OutreachOutcome>("spoke");
+  const [outreachNotes, setOutreachNotes] = useState("");
+  const [followUpDate, setFollowUpDate] = useState("");
   const statusInfo = LEAD_STATUS_INFO[lead.status];
   const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.trim() || lead.profile.email;
 
@@ -313,7 +324,7 @@ function LeadDetailPanel({
       {/* Tabs */}
       <div className="border-b border-white/10">
         <div className="flex">
-          {(["overview", "selection", "payments", "notes"] as const).map((tab) => (
+          {(["overview", "selection", "outreach", "payments", "notes"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -324,6 +335,9 @@ function LeadDetailPanel({
               }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === "outreach" && lead.outreach.totalOutreachCount > 0 && (
+                <span className="ml-1 text-xs text-white/40">({lead.outreach.totalOutreachCount})</span>
+              )}
             </button>
           ))}
         </div>
@@ -468,6 +482,198 @@ function LeadDetailPanel({
                 <p>No items selected yet</p>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "outreach" && (
+          <div className="space-y-6">
+            {/* Nurturing Status */}
+            <div>
+              <h3 className="text-sm font-light text-white/40 mb-3">Nurturing Status</h3>
+              <div className="flex gap-2">
+                {(Object.keys(NURTURING_STATUS_INFO) as NurturingStatus[]).map((status) => {
+                  const info = NURTURING_STATUS_INFO[status];
+                  const isActive = lead.outreach.nurturingStatus === status;
+                  return (
+                    <button
+                      key={status}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-light transition-colors ${
+                        isActive
+                          ? "bg-white text-black"
+                          : "bg-white/5 text-white/60 hover:bg-white/10"
+                      }`}
+                    >
+                      {info.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Outreach Summary */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <p className="text-white/40 font-light text-sm mb-1">Total Outreach</p>
+                <p className="text-2xl font-light text-white">
+                  {lead.outreach.totalOutreachCount}
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <p className="text-white/40 font-light text-sm mb-1">Last Contact</p>
+                <p className="text-lg font-light text-white">
+                  {lead.outreach.lastOutreachAt 
+                    ? new Date(lead.outreach.lastOutreachAt).toLocaleDateString("en-GB")
+                    : "Never"
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Next Follow-up */}
+            {lead.outreach.nextFollowUpAt && (
+              <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white font-light">Next Follow-up</p>
+                    <p className="text-white/60 font-light text-sm">
+                      {new Date(lead.outreach.nextFollowUpAt).toLocaleDateString("en-GB", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                      })}
+                    </p>
+                  </div>
+                  <Calendar className="w-5 h-5 text-white/40" />
+                </div>
+              </div>
+            )}
+
+            {/* Log New Outreach */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-light text-white/40">Log Outreach</h3>
+                <button
+                  onClick={() => setShowOutreachForm(!showOutreachForm)}
+                  className="text-sm text-white/60 hover:text-white font-light"
+                >
+                  {showOutreachForm ? "Cancel" : "+ Add"}
+                </button>
+              </div>
+
+              {showOutreachForm && (
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-4">
+                  <div>
+                    <label className="block text-sm text-white/40 font-light mb-2">Type</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {(Object.keys(OUTREACH_TYPE_INFO) as OutreachType[]).map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => setOutreachType(type)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-light transition-colors ${
+                            outreachType === type
+                              ? "bg-white text-black"
+                              : "bg-white/5 text-white/60 hover:bg-white/10"
+                          }`}
+                        >
+                          {OUTREACH_TYPE_INFO[type].label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/40 font-light mb-2">Outcome</label>
+                    <select
+                      value={outreachOutcome}
+                      onChange={(e) => setOutreachOutcome(e.target.value as OutreachOutcome)}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-light focus:outline-none focus:ring-1 focus:ring-white/30"
+                    >
+                      {(Object.keys(OUTREACH_OUTCOME_INFO) as OutreachOutcome[]).map((outcome) => (
+                        <option key={outcome} value={outcome}>
+                          {OUTREACH_OUTCOME_INFO[outcome].label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/40 font-light mb-2">Notes</label>
+                    <textarea
+                      value={outreachNotes}
+                      onChange={(e) => setOutreachNotes(e.target.value)}
+                      placeholder="What was discussed..."
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30 resize-none"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/40 font-light mb-2">Schedule Follow-up</label>
+                    <input
+                      type="date"
+                      value={followUpDate}
+                      onChange={(e) => setFollowUpDate(e.target.value)}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-light focus:outline-none focus:ring-1 focus:ring-white/30"
+                    />
+                  </div>
+
+                  <button className="w-full py-2 bg-white text-black rounded-lg font-light hover:bg-white/90 transition-colors">
+                    Log Outreach
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Outreach History */}
+            <div>
+              <h3 className="text-sm font-light text-white/40 mb-3">Outreach History</h3>
+              {lead.outreach.outreachHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {lead.outreach.outreachHistory.map((record) => (
+                    <div 
+                      key={record.id}
+                      className="bg-white/5 rounded-lg p-4 border border-white/10"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-light ${
+                            OUTREACH_OUTCOME_INFO[record.outcome].color
+                          }`}>
+                            {OUTREACH_OUTCOME_INFO[record.outcome].label}
+                          </span>
+                          <span className="text-white/40 text-xs font-light">
+                            via {OUTREACH_TYPE_INFO[record.type].label}
+                          </span>
+                        </div>
+                        <span className="text-white/40 text-xs font-light">
+                          {new Date(record.createdAt).toLocaleDateString("en-GB")}
+                        </span>
+                      </div>
+                      {record.notes && (
+                        <p className="text-white/60 font-light text-sm">{record.notes}</p>
+                      )}
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                        <span className="text-white/30 text-xs font-light">
+                          by {record.createdByName}
+                        </span>
+                        {record.followUpDate && (
+                          <span className="text-white/40 text-xs font-light flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            Follow-up: {record.followUpDate}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-white/30 font-light">
+                  <Phone className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No outreach recorded yet</p>
+                  <p className="text-sm mt-1">Log your first contact above</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

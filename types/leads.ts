@@ -95,6 +95,9 @@ export interface Lead {
   notes: LeadNote[];
   activities: LeadActivity[];
   
+  // Outreach tracking
+  outreach: LeadOutreach;
+  
   // Timestamps
   createdAt: string;
   updatedAt: string;
@@ -210,4 +213,56 @@ export const PAYMENT_STAGES = {
   production: { label: "Production", percentage: 70, description: "Due when production starts" },
   delivery: { label: "Delivery", percentage: 10, description: "Due on delivery" },
 } as const;
+
+// Outreach tracking
+export type OutreachType = "email" | "call" | "sms" | "meeting" | "other";
+export type OutreachOutcome = "no_answer" | "voicemail" | "spoke" | "email_sent" | "meeting_booked" | "not_interested" | "follow_up_needed";
+export type NurturingStatus = "active" | "nurturing" | "not_interested" | "do_not_contact";
+
+export interface OutreachRecord {
+  id: string;
+  leadId: string;
+  type: OutreachType;
+  outcome: OutreachOutcome;
+  notes: string | null;
+  followUpDate: string | null;
+  createdAt: string;
+  createdBy: string;
+  createdByName: string;
+}
+
+export interface LeadOutreach {
+  leadId: string;
+  nurturingStatus: NurturingStatus;
+  lastOutreachAt: string | null;
+  lastOutreachType: OutreachType | null;
+  nextFollowUpAt: string | null;
+  totalOutreachCount: number;
+  outreachHistory: OutreachRecord[];
+}
+
+export const OUTREACH_TYPE_INFO: Record<OutreachType, { label: string; icon: string }> = {
+  email: { label: "Email", icon: "Mail" },
+  call: { label: "Phone Call", icon: "Phone" },
+  sms: { label: "SMS", icon: "MessageSquare" },
+  meeting: { label: "Meeting", icon: "Calendar" },
+  other: { label: "Other", icon: "MoreHorizontal" },
+};
+
+export const OUTREACH_OUTCOME_INFO: Record<OutreachOutcome, { label: string; color: string }> = {
+  no_answer: { label: "No Answer", color: "bg-white/10 text-white/60" },
+  voicemail: { label: "Left Voicemail", color: "bg-white/10 text-white/60" },
+  spoke: { label: "Spoke with Client", color: "bg-white/20 text-white" },
+  email_sent: { label: "Email Sent", color: "bg-white/20 text-white" },
+  meeting_booked: { label: "Meeting Booked", color: "bg-white text-black" },
+  not_interested: { label: "Not Interested", color: "bg-white/5 text-white/40" },
+  follow_up_needed: { label: "Follow-up Needed", color: "bg-white/30 text-white" },
+};
+
+export const NURTURING_STATUS_INFO: Record<NurturingStatus, { label: string; description: string; color: string }> = {
+  active: { label: "Active", description: "Actively pursuing", color: "bg-white/20 text-white" },
+  nurturing: { label: "Nurturing", description: "Long-term follow-up", color: "bg-white/10 text-white/60" },
+  not_interested: { label: "Not Interested", description: "Declined for now", color: "bg-white/5 text-white/40" },
+  do_not_contact: { label: "Do Not Contact", description: "Opted out", color: "bg-white/5 text-white/30" },
+};
 
