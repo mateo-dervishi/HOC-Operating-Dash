@@ -1,23 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragStartEvent,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   Users,
   Plus,
@@ -27,180 +11,122 @@ import {
   Phone,
   Mail,
   Calendar,
-  DollarSign,
   Clock,
+  ArrowRight,
+  Eye,
+  ChevronDown,
+  Building2,
+  Package,
+  Send,
+  MessageSquare,
+  DollarSign,
+  TrendingUp,
 } from "lucide-react";
-import { PIPELINE_STAGES, PipelineStage, PRIORITIES } from "@/types/admin";
+import { 
+  Lead, 
+  LeadStatus, 
+  LEAD_STATUS_INFO,
+  PAYMENT_STAGES,
+} from "@/types/leads";
+import { getMockLeads, getMockLeadStats } from "@/lib/services/leads";
 
-interface Client {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  company?: string;
-  stage: PipelineStage;
-  priority: "low" | "normal" | "high" | "urgent";
-  estimatedValue: number;
-  lastActivity: string;
-  nextFollowUp?: string;
-  assignedTo: string;
-}
-
-const MOCK_CLIENTS: Client[] = [
-  {
-    id: "1",
-    name: "James Richardson",
-    email: "james@richardson.com",
-    phone: "020 7123 4567",
-    company: "Richardson Interiors",
-    stage: "new_lead",
-    priority: "high",
-    estimatedValue: 45000,
-    lastActivity: "2 hours ago",
-    nextFollowUp: "Today",
-    assignedTo: "Mateo",
-  },
-  {
-    id: "2",
-    name: "Sarah Mitchell",
-    email: "sarah@mitchellhome.co.uk",
-    phone: "020 8234 5678",
-    stage: "selection_submitted",
-    priority: "normal",
-    estimatedValue: 32000,
-    lastActivity: "1 day ago",
-    assignedTo: "Mateo",
-  },
-  {
-    id: "3",
-    name: "David Thompson",
-    email: "david.t@email.com",
-    phone: "07700 900123",
-    company: "Thompson & Partners",
-    stage: "quoted",
-    priority: "urgent",
-    estimatedValue: 78000,
-    lastActivity: "3 hours ago",
-    nextFollowUp: "Tomorrow",
-    assignedTo: "Mateo",
-  },
-  {
-    id: "4",
-    name: "Emma Wilson",
-    email: "emma.wilson@gmail.com",
-    phone: "07700 900456",
-    stage: "negotiating",
-    priority: "high",
-    estimatedValue: 25000,
-    lastActivity: "5 hours ago",
-    assignedTo: "Mateo",
-  },
-  {
-    id: "5",
-    name: "Michael Brown",
-    email: "m.brown@browndesign.com",
-    phone: "020 7456 7890",
-    company: "Brown Design Studio",
-    stage: "confirmed",
-    priority: "normal",
-    estimatedValue: 56000,
-    lastActivity: "2 days ago",
-    assignedTo: "Mateo",
-  },
-  {
-    id: "6",
-    name: "Lisa Anderson",
-    email: "lisa@andersonarch.com",
-    phone: "07800 123456",
-    company: "Anderson Architecture",
-    stage: "in_progress",
-    priority: "normal",
-    estimatedValue: 89000,
-    lastActivity: "1 day ago",
-    assignedTo: "Mateo",
-  },
-  {
-    id: "7",
-    name: "Robert Taylor",
-    email: "r.taylor@email.co.uk",
-    phone: "020 8567 8901",
-    stage: "new_lead",
-    priority: "low",
-    estimatedValue: 15000,
-    lastActivity: "4 days ago",
-    assignedTo: "Mateo",
-  },
-  {
-    id: "8",
-    name: "Jennifer Clark",
-    email: "jen.clark@clarkinteriors.com",
-    phone: "07900 234567",
-    company: "Clark Interiors",
-    stage: "quoted",
-    priority: "normal",
-    estimatedValue: 42000,
-    lastActivity: "6 hours ago",
-    nextFollowUp: "In 2 days",
-    assignedTo: "Mateo",
-  },
+// Pipeline stages for Kanban view
+const PIPELINE_STAGES: LeadStatus[] = [
+  "registered",
+  "browsing", 
+  "submitted",
+  "contacted",
+  "meeting_scheduled",
+  "quoted",
+  "deposit_paid",
+  "in_production",
 ];
 
-function ClientCard({ client, isDragging }: { client: Client; isDragging?: boolean }) {
-  const priorityColors = {
-    low: "bg-white/10 text-white/60",
-    normal: "bg-white/10 text-white/60",
-    high: "bg-white/20 text-white",
-    urgent: "bg-white text-black",
-  };
+function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
+  const statusInfo = LEAD_STATUS_INFO[lead.status];
+  const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.trim() || lead.profile.email;
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const paymentProgress = lead.selectionValue > 0 
+    ? Math.round((lead.totalPaid / lead.selectionValue) * 100) 
+    : 0;
 
   return (
     <div
-      className={`bg-white/5 rounded-lg border border-white/10 p-4 hover:bg-white/10 transition-colors cursor-grab ${
-        isDragging ? "ring-1 ring-white/30 opacity-90" : ""
-      }`}
+      onClick={onClick}
+      className="bg-white/5 rounded-lg border border-white/10 p-4 hover:bg-white/10 transition-colors cursor-pointer group"
     >
       <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <h4 className="font-light text-white truncate">{client.name}</h4>
-          {client.company && (
-            <p className="text-sm text-white/40 font-light truncate">{client.company}</p>
-          )}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white text-sm font-light">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <h4 className="font-light text-white truncate">{name}</h4>
+            {lead.profile.company && (
+              <p className="text-xs text-white/40 font-light flex items-center gap-1">
+                <Building2 className="w-3 h-3" />
+                {lead.profile.company}
+              </p>
+            )}
+          </div>
         </div>
-        <button className="p-1 hover:bg-white/10 rounded">
+        <button 
+          onClick={(e) => { e.stopPropagation(); }}
+          className="p-1 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded transition-all"
+        >
           <MoreHorizontal className="w-4 h-4 text-white/40" />
         </button>
       </div>
 
-      <div className="space-y-2 mb-3">
-        <div className="flex items-center gap-2 text-sm text-white/40 font-light">
-          <Mail className="w-3.5 h-3.5" />
-          <span className="truncate">{client.email}</span>
+      {lead.selectionCount > 0 && (
+        <div className="flex items-center gap-2 mb-3 text-sm">
+          <Package className="w-3.5 h-3.5 text-white/40" />
+          <span className="text-white/60 font-light">
+            {lead.selectionCount} items • £{lead.selectionValue.toLocaleString()}
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-white/40 font-light">
-          <Phone className="w-3.5 h-3.5" />
-          <span>{client.phone}</span>
-        </div>
-      </div>
+      )}
 
-      <div className="flex items-center gap-2 mb-3">
-        <span className={`px-2 py-0.5 rounded text-xs font-light ${priorityColors[client.priority]}`}>
-          {PRIORITIES[client.priority].label}
-        </span>
-        <span className="flex items-center gap-1 text-xs text-white/40 font-light">
-          <DollarSign className="w-3 h-3" />
-          £{client.estimatedValue.toLocaleString()}
-        </span>
-      </div>
+      {lead.submission && (
+        <div className="mb-3 px-2 py-1.5 bg-white/5 rounded text-xs font-light">
+          <span className="text-white/40">Ref:</span>{" "}
+          <span className="text-white/60">{lead.submission.submission_number}</span>
+        </div>
+      )}
+
+      {lead.totalPaid > 0 && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-white/40 font-light">Payment Progress</span>
+            <span className="text-white/60 font-light">{paymentProgress}%</span>
+          </div>
+          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-white/60 rounded-full transition-all"
+              style={{ width: `${paymentProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between text-xs text-white/30 font-light pt-2 border-t border-white/10">
         <span className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {client.lastActivity}
+          {new Date(lead.createdAt).toLocaleDateString("en-GB", { 
+            day: "numeric", 
+            month: "short" 
+          })}
         </span>
-        {client.nextFollowUp && (
-          <span className="flex items-center gap-1 text-white/60">
+        {lead.nextFollowUp && (
+          <span className="flex items-center gap-1 text-white/50">
             <Calendar className="w-3 h-3" />
-            {client.nextFollowUp}
+            Follow-up: {lead.nextFollowUp}
           </span>
         )}
       </div>
@@ -208,70 +134,475 @@ function ClientCard({ client, isDragging }: { client: Client; isDragging?: boole
   );
 }
 
-function SortableClientCard({ client }: { client: Client }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: client.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
+  const statusInfo = LEAD_STATUS_INFO[lead.status];
+  const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.trim() || lead.profile.email;
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <ClientCard client={client} isDragging={isDragging} />
+    <tr 
+      onClick={onClick}
+      className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+    >
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white text-sm font-light">
+            {name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+          </div>
+          <div>
+            <p className="font-light text-white">{name}</p>
+            <p className="text-sm text-white/40 font-light">{lead.profile.email}</p>
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        {lead.profile.company && (
+          <p className="font-light text-white/60">{lead.profile.company}</p>
+        )}
+        {lead.profile.phone && (
+          <p className="text-sm text-white/40 font-light">{lead.profile.phone}</p>
+        )}
+      </td>
+      <td className="px-6 py-4">
+        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-light ${statusInfo.color}`}>
+          {statusInfo.label}
+        </span>
+      </td>
+      <td className="px-6 py-4">
+        <p className="font-light text-white">{lead.selectionCount} items</p>
+        {lead.selectionValue > 0 && (
+          <p className="text-sm text-white/40 font-light">
+            £{lead.selectionValue.toLocaleString()}
+          </p>
+        )}
+      </td>
+      <td className="px-6 py-4">
+        {lead.submission ? (
+          <span className="text-white/60 font-light">{lead.submission.submission_number}</span>
+        ) : (
+          <span className="text-white/30 font-light">-</span>
+        )}
+      </td>
+      <td className="px-6 py-4">
+        <p className="text-white/60 font-light">
+          {new Date(lead.createdAt).toLocaleDateString("en-GB")}
+        </p>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={(e) => { e.stopPropagation(); }}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            title="Call"
+          >
+            <Phone className="w-4 h-4 text-white/40" />
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); }}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            title="Email"
+          >
+            <Mail className="w-4 h-4 text-white/40" />
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); }}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <MoreHorizontal className="w-4 h-4 text-white/40" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function PipelineColumn({ 
+  status, 
+  leads,
+  onLeadClick,
+}: { 
+  status: LeadStatus; 
+  leads: Lead[];
+  onLeadClick: (lead: Lead) => void;
+}) {
+  const statusInfo = LEAD_STATUS_INFO[status];
+  const totalValue = leads.reduce((sum, l) => sum + l.selectionValue, 0);
+
+  return (
+    <div className="flex-shrink-0 w-72 bg-white/5 rounded-xl border border-white/10">
+      <div className="p-4 border-b border-white/10">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <h3 className="font-light text-white text-sm">{statusInfo.label}</h3>
+            <span className="bg-white/10 text-white/60 text-xs font-light px-2 py-0.5 rounded-full">
+              {leads.length}
+            </span>
+          </div>
+        </div>
+        <p className="text-xs text-white/40 font-light">
+          £{totalValue.toLocaleString()} value
+        </p>
+      </div>
+
+      <div className="p-2 space-y-2 min-h-[200px] max-h-[calc(100vh-380px)] overflow-y-auto">
+        {leads.map((lead) => (
+          <LeadCard 
+            key={lead.id} 
+            lead={lead} 
+            onClick={() => onLeadClick(lead)}
+          />
+        ))}
+        {leads.length === 0 && (
+          <div className="text-center py-8 text-white/20 font-light">
+            <p className="text-xs">No leads</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function PipelineColumn({
-  stage,
-  clients,
-}: {
-  stage: PipelineStage;
-  clients: Client[];
+function LeadDetailPanel({ 
+  lead, 
+  onClose 
+}: { 
+  lead: Lead; 
+  onClose: () => void;
 }) {
-  const stageInfo = PIPELINE_STAGES[stage];
-  const totalValue = clients.reduce((sum, c) => sum + c.estimatedValue, 0);
+  const [activeTab, setActiveTab] = useState<"overview" | "selection" | "payments" | "notes">("overview");
+  const statusInfo = LEAD_STATUS_INFO[lead.status];
+  const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.trim() || lead.profile.email;
 
   return (
-    <div className="flex-shrink-0 w-80 bg-white/5 rounded-xl border border-white/10">
-      <div className="p-4 border-b border-white/10">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-white" />
-            <h3 className="font-light text-white">{stageInfo.label}</h3>
-            <span className="bg-white/10 text-white/60 text-xs font-light px-2 py-0.5 rounded-full">
-              {clients.length}
-            </span>
-          </div>
-          <button className="p-1 hover:bg-white/10 rounded">
-            <Plus className="w-4 h-4 text-white/40" />
-          </button>
-        </div>
-        <p className="text-sm text-white/40 font-light">
-          £{totalValue.toLocaleString()} total value
-        </p>
+    <div className="fixed inset-y-0 right-0 w-full max-w-xl bg-black border-l border-white/10 z-50 overflow-y-auto">
+      <div className="sticky top-0 bg-black border-b border-white/10 p-4 flex items-center justify-between">
+        <h2 className="text-lg font-light text-white">{name}</h2>
+        <button 
+          onClick={onClose}
+          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <ArrowRight className="w-5 h-5 text-white/40" />
+        </button>
       </div>
 
-      <div className="p-3 space-y-3 min-h-[200px] max-h-[calc(100vh-320px)] overflow-y-auto">
-        <SortableContext
-          items={clients.map((c) => c.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {clients.map((client) => (
-            <SortableClientCard key={client.id} client={client} />
+      {/* Status Badge */}
+      <div className="p-4 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <span className={`px-3 py-1.5 rounded-full text-sm font-light ${statusInfo.color}`}>
+            {statusInfo.label}
+          </span>
+          <span className="text-white/40 font-light text-sm">{statusInfo.description}</span>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="p-4 border-b border-white/10 flex gap-2">
+        <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-white/60 font-light text-sm">
+          <Phone className="w-4 h-4" />
+          Call
+        </button>
+        <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-white/60 font-light text-sm">
+          <Mail className="w-4 h-4" />
+          Email
+        </button>
+        <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-white/60 font-light text-sm">
+          <Send className="w-4 h-4" />
+          Quote
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-white/10">
+        <div className="flex">
+          {(["overview", "selection", "payments", "notes"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 px-4 py-3 text-sm font-light transition-colors ${
+                activeTab === tab
+                  ? "text-white border-b-2 border-white"
+                  : "text-white/40 hover:text-white/60"
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
           ))}
-        </SortableContext>
-        {clients.length === 0 && (
-          <div className="text-center py-8 text-white/30 font-light">
-            <p className="text-sm">No clients in this stage</p>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="p-4">
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            {/* Contact Info */}
+            <div>
+              <h3 className="text-sm font-light text-white/40 mb-3">Contact Information</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Mail className="w-4 h-4 text-white/40" />
+                  <span className="text-white/80 font-light">{lead.profile.email}</span>
+                </div>
+                {lead.profile.phone && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-4 h-4 text-white/40" />
+                    <span className="text-white/80 font-light">{lead.profile.phone}</span>
+                  </div>
+                )}
+                {lead.profile.company && (
+                  <div className="flex items-center gap-3">
+                    <Building2 className="w-4 h-4 text-white/40" />
+                    <span className="text-white/80 font-light">{lead.profile.company}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Address */}
+            {lead.profile.address_line_1 && (
+              <div>
+                <h3 className="text-sm font-light text-white/40 mb-3">Address</h3>
+                <p className="text-white/80 font-light">
+                  {lead.profile.address_line_1}
+                  {lead.profile.address_line_2 && <>, {lead.profile.address_line_2}</>}
+                  <br />
+                  {lead.profile.city}, {lead.profile.postcode}
+                  <br />
+                  {lead.profile.country}
+                </p>
+              </div>
+            )}
+
+            {/* Submission Info */}
+            {lead.submission && (
+              <div>
+                <h3 className="text-sm font-light text-white/40 mb-3">Submission</h3>
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white font-light">{lead.submission.submission_number}</span>
+                    <span className="text-white/60 font-light text-sm">
+                      {new Date(lead.submission.submitted_at).toLocaleDateString("en-GB")}
+                    </span>
+                  </div>
+                  {lead.submission.notes && (
+                    <p className="text-white/60 font-light text-sm">{lead.submission.notes}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Timeline */}
+            <div>
+              <h3 className="text-sm font-light text-white/40 mb-3">Timeline</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-white/40 font-light">Registered</span>
+                  <span className="text-white/60 font-light">
+                    {new Date(lead.createdAt).toLocaleDateString("en-GB")}
+                  </span>
+                </div>
+                {lead.lastContactedAt && (
+                  <div className="flex justify-between">
+                    <span className="text-white/40 font-light">Last Contacted</span>
+                    <span className="text-white/60 font-light">
+                      {new Date(lead.lastContactedAt).toLocaleDateString("en-GB")}
+                    </span>
+                  </div>
+                )}
+                {lead.meetingScheduledAt && (
+                  <div className="flex justify-between">
+                    <span className="text-white/40 font-light">Meeting</span>
+                    <span className="text-white/60 font-light">
+                      {new Date(lead.meetingScheduledAt).toLocaleDateString("en-GB")}
+                    </span>
+                  </div>
+                )}
+                {lead.nextFollowUp && (
+                  <div className="flex justify-between">
+                    <span className="text-white/40 font-light">Next Follow-up</span>
+                    <span className="text-white font-light">{lead.nextFollowUp}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "selection" && (
+          <div className="space-y-4">
+            {lead.selectionItems.length > 0 ? (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-white/40 font-light text-sm">
+                    {lead.selectionCount} items selected
+                  </span>
+                  <span className="text-white font-light">
+                    £{lead.selectionValue.toLocaleString()}
+                  </span>
+                </div>
+                {lead.selectionItems.map((item) => (
+                  <div 
+                    key={item.id}
+                    className="bg-white/5 rounded-lg p-4 border border-white/10"
+                  >
+                    <div className="flex justify-between mb-1">
+                      <span className="text-white font-light">{item.product_name}</span>
+                      <span className="text-white/60 font-light">
+                        £{((item.unit_price || 0) * item.quantity).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-white/40 font-light">
+                      {item.product_category && <span>{item.product_category}</span>}
+                      {item.colour && <span>• {item.colour}</span>}
+                      <span>• Qty: {item.quantity}</span>
+                    </div>
+                    {item.notes && (
+                      <p className="text-sm text-white/40 font-light mt-2 italic">
+                        "{item.notes}"
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </>
+            ) : (
+              <div className="text-center py-8 text-white/30 font-light">
+                <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No items selected yet</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "payments" && (
+          <div className="space-y-6">
+            {/* Payment Summary */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <p className="text-white/40 font-light text-sm mb-1">Total Value</p>
+                <p className="text-2xl font-light text-white">
+                  £{lead.selectionValue.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <p className="text-white/40 font-light text-sm mb-1">Amount Paid</p>
+                <p className="text-2xl font-light text-white">
+                  £{lead.totalPaid.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Payment Stages */}
+            <div>
+              <h3 className="text-sm font-light text-white/40 mb-3">Payment Schedule</h3>
+              <div className="space-y-3">
+                {(["deposit", "production", "delivery"] as const).map((stage) => {
+                  const stageInfo = PAYMENT_STAGES[stage];
+                  const payment = lead.payments.find((p) => p.type === stage);
+                  const amount = Math.round(lead.selectionValue * (stageInfo.percentage / 100));
+                  
+                  return (
+                    <div 
+                      key={stage}
+                      className="bg-white/5 rounded-lg p-4 border border-white/10"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span className="text-white font-light">{stageInfo.label}</span>
+                          <span className="text-white/40 font-light text-sm ml-2">
+                            ({stageInfo.percentage}%)
+                          </span>
+                        </div>
+                        <span className="text-white font-light">
+                          £{amount.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/40 font-light text-sm">
+                          {stageInfo.description}
+                        </span>
+                        {payment?.status === "paid" ? (
+                          <span className="px-2 py-0.5 bg-white text-black rounded text-xs font-light">
+                            Paid
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-white/10 text-white/60 rounded text-xs font-light">
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Payment History */}
+            {lead.payments.length > 0 && (
+              <div>
+                <h3 className="text-sm font-light text-white/40 mb-3">Payment History</h3>
+                <div className="space-y-2">
+                  {lead.payments.map((payment) => (
+                    <div 
+                      key={payment.id}
+                      className="flex items-center justify-between py-2 border-b border-white/5"
+                    >
+                      <div>
+                        <p className="text-white font-light text-sm">{payment.reference}</p>
+                        <p className="text-white/40 font-light text-xs">
+                          {payment.paidAt && new Date(payment.paidAt).toLocaleDateString("en-GB")}
+                        </p>
+                      </div>
+                      <span className="text-white font-light">
+                        £{payment.amount.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "notes" && (
+          <div className="space-y-4">
+            {/* Add Note */}
+            <div>
+              <textarea
+                placeholder="Add a note..."
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30 resize-none"
+                rows={3}
+              />
+              <div className="flex justify-end mt-2">
+                <button className="px-4 py-2 bg-white text-black rounded-lg font-light text-sm hover:bg-white/90 transition-colors">
+                  Add Note
+                </button>
+              </div>
+            </div>
+
+            {/* Notes List */}
+            {lead.notes.length > 0 ? (
+              <div className="space-y-3">
+                {lead.notes.map((note) => (
+                  <div 
+                    key={note.id}
+                    className={`bg-white/5 rounded-lg p-4 border ${
+                      note.isPinned ? "border-white/30" : "border-white/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white/60 font-light text-sm">{note.authorName}</span>
+                      <span className="text-white/40 font-light text-xs">
+                        {new Date(note.createdAt).toLocaleDateString("en-GB")}
+                      </span>
+                    </div>
+                    <p className="text-white/80 font-light text-sm">{note.content}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-white/30 font-light">
+                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No notes yet</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -280,139 +611,207 @@ function PipelineColumn({
 }
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS);
-  const [activeClient, setActiveClient] = useState<Client | null>(null);
+  const [viewMode, setViewMode] = useState<"pipeline" | "list">("pipeline");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor)
-  );
+  // Use mock data for now
+  const leads = getMockLeads();
+  const stats = getMockLeadStats();
 
-  const clientsByStage = Object.keys(PIPELINE_STAGES).reduce((acc, stage) => {
-    acc[stage as PipelineStage] = clients.filter(
-      (c) =>
-        c.stage === stage &&
-        (searchQuery === "" ||
-          c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          c.company?.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-    return acc;
-  }, {} as Record<PipelineStage, Client[]>);
+  const filteredLeads = useMemo(() => {
+    return leads.filter((lead) => {
+      const name = `${lead.profile.first_name || ""} ${lead.profile.last_name || ""}`.toLowerCase();
+      const matchesSearch =
+        searchQuery === "" ||
+        name.includes(searchQuery.toLowerCase()) ||
+        lead.profile.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lead.profile.company?.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const client = clients.find((c) => c.id === event.active.id);
-    if (client) setActiveClient(client);
-  };
+      const matchesStatus =
+        statusFilter === "all" || lead.status === statusFilter;
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveClient(null);
+      return matchesSearch && matchesStatus;
+    });
+  }, [leads, searchQuery, statusFilter]);
 
-    if (!over) return;
-
-    const activeClient = clients.find((c) => c.id === active.id);
-    if (!activeClient) return;
-
-    const overClient = clients.find((c) => c.id === over.id);
-    if (overClient && activeClient.stage !== overClient.stage) {
-      setClients((prev) =>
-        prev.map((c) =>
-          c.id === active.id ? { ...c, stage: overClient.stage } : c
-        )
-      );
-    }
-  };
-
-  const visibleStages: PipelineStage[] = [
-    "new_lead",
-    "selection_submitted",
-    "quoted",
-    "negotiating",
-    "confirmed",
-    "in_progress",
-    "delivered",
-  ];
+  const leadsByStatus = useMemo(() => {
+    return PIPELINE_STAGES.reduce((acc, status) => {
+      acc[status] = filteredLeads.filter((l) => l.status === status);
+      return acc;
+    }, {} as Record<LeadStatus, Lead[]>);
+  }, [filteredLeads]);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-light text-white">Client Pipeline</h1>
+          <h1 className="text-2xl font-light text-white">Lead Management</h1>
           <p className="text-white/40 mt-1 font-light">
-            Manage your clients through the sales pipeline
+            {stats.total} leads • £{stats.totalPipelineValue.toLocaleString()} pipeline value
           </p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:bg-white/90 transition-colors font-light">
           <Plus className="w-4 h-4" />
-          Add Client
+          Add Lead
         </button>
       </div>
 
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="w-5 h-5 text-white/40" />
+            <div>
+              <p className="text-lg font-light text-white">{stats.newThisWeek}</p>
+              <p className="text-xs text-white/40 font-light">New This Week</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center gap-3">
+            <Package className="w-5 h-5 text-white/40" />
+            <div>
+              <p className="text-lg font-light text-white">{stats.byStatus.submitted || 0}</p>
+              <p className="text-xs text-white/40 font-light">Awaiting Review</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-5 h-5 text-white/40" />
+            <div>
+              <p className="text-lg font-light text-white">{stats.byStatus.meeting_scheduled || 0}</p>
+              <p className="text-xs text-white/40 font-light">Meetings Scheduled</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center gap-3">
+            <DollarSign className="w-5 h-5 text-white/40" />
+            <div>
+              <p className="text-lg font-light text-white">
+                £{Math.round(stats.avgSelectionValue).toLocaleString()}
+              </p>
+              <p className="text-xs text-white/40 font-light">Avg Selection Value</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
             type="text"
-            placeholder="Search clients..."
+            placeholder="Search leads..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30"
+            className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 font-light focus:outline-none focus:ring-1 focus:ring-white/30"
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white/60 font-light">
-          <Filter className="w-4 h-4" />
-          Filters
-        </button>
-        <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white/60 font-light">
-          <Users className="w-4 h-4" />
-          Assigned to me
-        </button>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as LeadStatus | "all")}
+          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 font-light focus:outline-none focus:ring-1 focus:ring-white/30"
+        >
+          <option value="all">All Statuses</option>
+          {Object.entries(LEAD_STATUS_INFO).map(([status, info]) => (
+            <option key={status} value={status}>
+              {info.label}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode("pipeline")}
+            className={`px-4 py-1.5 rounded-md text-sm font-light transition-colors ${
+              viewMode === "pipeline"
+                ? "bg-white text-black"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            Pipeline
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`px-4 py-1.5 rounded-md text-sm font-light transition-colors ${
+              viewMode === "list"
+                ? "bg-white text-black"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            List
+          </button>
+        </div>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
+      {/* Content */}
+      {viewMode === "pipeline" ? (
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
-          {visibleStages.map((stage) => (
+          {PIPELINE_STAGES.map((status) => (
             <PipelineColumn
-              key={stage}
-              stage={stage}
-              clients={clientsByStage[stage]}
+              key={status}
+              status={status}
+              leads={leadsByStatus[status] || []}
+              onLeadClick={setSelectedLead}
             />
           ))}
         </div>
+      ) : (
+        <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className="px-6 py-4 font-light text-white/60 text-sm">Contact</th>
+                  <th className="px-6 py-4 font-light text-white/60 text-sm">Company</th>
+                  <th className="px-6 py-4 font-light text-white/60 text-sm">Status</th>
+                  <th className="px-6 py-4 font-light text-white/60 text-sm">Selection</th>
+                  <th className="px-6 py-4 font-light text-white/60 text-sm">Reference</th>
+                  <th className="px-6 py-4 font-light text-white/60 text-sm">Created</th>
+                  <th className="px-6 py-4 font-light text-white/60 text-sm w-32"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLeads.map((lead) => (
+                  <LeadRow 
+                    key={lead.id} 
+                    lead={lead} 
+                    onClick={() => setSelectedLead(lead)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        <DragOverlay>
-          {activeClient ? <ClientCard client={activeClient} isDragging /> : null}
-        </DragOverlay>
-      </DndContext>
+          {filteredLeads.length === 0 && (
+            <div className="text-center py-12 text-white/40 font-light">
+              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No leads found</p>
+            </div>
+          )}
+        </div>
+      )}
 
-      <div className="flex items-center gap-6 text-sm text-white/40 font-light pt-4 border-t border-white/10">
-        <span>
-          <strong className="text-white">{clients.length}</strong> total clients
-        </span>
-        <span>
-          <strong className="text-white">
-            £{clients.reduce((sum, c) => sum + c.estimatedValue, 0).toLocaleString()}
-          </strong>{" "}
-          pipeline value
-        </span>
-        <span>
-          <strong className="text-white">
-            {clients.filter((c) => c.priority === "urgent" || c.priority === "high").length}
-          </strong>{" "}
-          high priority
-        </span>
-      </div>
+      {/* Lead Detail Panel */}
+      {selectedLead && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setSelectedLead(null)}
+          />
+          <LeadDetailPanel
+            lead={selectedLead}
+            onClose={() => setSelectedLead(null)}
+          />
+        </>
+      )}
     </div>
   );
 }
