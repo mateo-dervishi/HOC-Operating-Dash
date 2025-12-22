@@ -153,12 +153,16 @@ export async function fetchLeads(): Promise<Lead[]> {
     const selectionValue = calculateSelectionValue(selections);
     const status = determineLeadStatus(profile, selections, submission, pipeline);
     
+    // Normalize old "website" source to new "website_signup"
+    const rawSource = pipeline?.source || profile.lead_source || "website_signup";
+    const source: LeadSource = rawSource === "website" ? "website_signup" : rawSource as LeadSource;
+    
     return {
       id: profile.id,
       profile,
       status,
       priority: pipeline?.priority || "normal",
-      source: pipeline?.source || "website",
+      source,
       selectionItems: selections,
       selectionValue,
       selectionCount: selections.length,
