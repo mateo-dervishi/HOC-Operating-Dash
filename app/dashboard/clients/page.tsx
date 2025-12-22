@@ -25,7 +25,9 @@ import {
 import { 
   Lead, 
   LeadStatus, 
+  LeadSource,
   LEAD_STATUS_INFO,
+  LEAD_SOURCE_INFO,
   PAYMENT_STAGES,
   OUTREACH_TYPE_INFO,
   OUTREACH_OUTCOME_INFO,
@@ -33,8 +35,9 @@ import {
   OutreachType,
   OutreachOutcome,
   NurturingStatus,
+  SourceStats,
 } from "@/types/leads";
-import { getMockLeads, getMockLeadStats } from "@/lib/services/leads";
+import { getMockLeads, getMockLeadStats, getMockSourceStats, getMockNewsletterSubscribers } from "@/lib/services/leads";
 import { Modal } from "@/components/ui/Modal";
 import { AddClientForm, ClientFormData } from "@/components/forms/AddClientForm";
 
@@ -90,6 +93,13 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
         >
           <MoreHorizontal className="w-4 h-4 text-white/40" />
         </button>
+      </div>
+
+      {/* Source Badge */}
+      <div className="mb-2">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-light ${LEAD_SOURCE_INFO[lead.source]?.color || "bg-white/10 text-white/50"}`}>
+          {LEAD_SOURCE_INFO[lead.source]?.label || lead.source}
+        </span>
       </div>
 
       {lead.selectionCount > 0 && (
@@ -822,12 +832,16 @@ export default function ClientsPage() {
   const [viewMode, setViewMode] = useState<"pipeline" | "list">("pipeline");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
+  const [sourceFilter, setSourceFilter] = useState<LeadSource | "all">("all");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAddClient, setShowAddClient] = useState(false);
+  const [showSourceStats, setShowSourceStats] = useState(false);
 
   // Use mock data for now
   const leads = getMockLeads();
   const stats = getMockLeadStats();
+  const sourceStats = getMockSourceStats();
+  const newsletterSubscribers = getMockNewsletterSubscribers();
 
   const handleAddClient = (data: ClientFormData) => {
     console.log("New client:", data);
@@ -847,9 +861,12 @@ export default function ClientsPage() {
       const matchesStatus =
         statusFilter === "all" || lead.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      const matchesSource =
+        sourceFilter === "all" || lead.source === sourceFilter;
+
+      return matchesSearch && matchesStatus && matchesSource;
     });
-  }, [leads, searchQuery, statusFilter]);
+  }, [leads, searchQuery, statusFilter, sourceFilter]);
 
   const leadsByStatus = useMemo(() => {
     return PIPELINE_STAGES.reduce((acc, status) => {
@@ -877,7 +894,87 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Source Stats Toggle */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => setShowSourceStats(!showSourceStats)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-light transition-colors ${
+            showSourceStats 
+              ? "bg-white text-black" 
+              : "bg-white/5 text-white/60 border border-white/10 hover:bg-white/10"
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          Lead Sources
+          <ChevronDown className={`w-4 h-4 transition-transform ${showSourceStats ? "rotate-180" : ""}`} />
+        </button>
+        <span className="text-sm text-white/40 font-light">
+          {stats.newsletterSubscribers} newsletter subscribers • {stats.newsletterConversionRate.toFixed(0)}% converted to accounts
+        </span>
+      </div>
+
+      {/* Source Stats Panel */}
+      {showSourceStats && (
+        <div className="bg-white/5 rounded-xl border border-white/10 p-5">
+          <h3 className="text-sm font-light text-white/60 mb-4">Lead Sources Breakdown</h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {sourceStats.map((stat) => (
+              <button
+                key={stat.source}
+                onClick={() => setSourceFilter(sourceFilter === stat.source ? "all" : stat.source)}
+                className={`p-4 rounded-lg border transition-all text-left ${
+                  sourceFilter === stat.source
+                    ? "bg-white text-black border-white"
+                    : "bg-white/5 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                <p className={`text-2xl font-light ${sourceFilter === stat.source ? "text-black" : "text-white"}`}>
+                  {stat.count}
+                </p>
+                <p className={`text-sm font-light ${sourceFilter === stat.source ? "text-black/60" : "text-white/60"}`}>
+                  {LEAD_SOURCE_INFO[stat.source]?.label || stat.source}
+                </p>
+                <p className={`text-xs font-light mt-1 ${sourceFilter === stat.source ? "text-black/40" : "text-white/40"}`}>
+                  {stat.conversionRate.toFixed(0)}% converted • £{stat.totalValue.toLocaleString()}
+                </p>
+              </button>
+            ))}
+          </div>
+          
+          {/* Newsletter Subscribers Preview */}
+          <div className="mt-6 pt-4 border-t border-white/10">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-light text-white/60">Newsletter Only (Not Registered)</h4>
+              <span className="text-xs text-white/40 font-light">
+                {newsletterSubscribers.filter(s => !s.convertedToAccount).length} subscribers
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {newsletterSubscribers
+                .filter(s => !s.convertedToAccount)
+                .slice(0, 5)
+                .map(sub => (
+                  <span
+                    key={sub.id}
+                    className="px-3 py-1.5 bg-white/5 rounded-lg text-sm text-white/60 font-light"
+                  >
+                    {sub.email}
+                    {sub.utmSource && (
+                      <span className="text-white/30 ml-2">via {sub.utmSource}</span>
+                    )}
+                  </span>
+                ))}
+              {newsletterSubscribers.filter(s => !s.convertedToAccount).length > 5 && (
+                <span className="px-3 py-1.5 text-sm text-white/40 font-light">
+                  +{newsletterSubscribers.filter(s => !s.convertedToAccount).length - 5} more
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <div className="flex items-center gap-3">
@@ -940,6 +1037,19 @@ export default function ClientsPage() {
           <option value="all">All Statuses</option>
           {Object.entries(LEAD_STATUS_INFO).map(([status, info]) => (
             <option key={status} value={status}>
+              {info.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value as LeadSource | "all")}
+          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/60 font-light focus:outline-none focus:ring-1 focus:ring-white/30"
+        >
+          <option value="all">All Sources</option>
+          {Object.entries(LEAD_SOURCE_INFO).map(([source, info]) => (
+            <option key={source} value={source}>
               {info.label}
             </option>
           ))}

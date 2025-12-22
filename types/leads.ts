@@ -13,9 +13,77 @@ export type LeadStatus =
   | "completed"         // Fully delivered and paid
   | "lost"              // Didn't convert
 
-export type LeadSource = "website" | "referral" | "social" | "other";
+// Lead sources - tracks where leads originally came from
+export type LeadSource = 
+  | "website_signup"      // Created full account on main website
+  | "website_newsletter"  // Newsletter signup only (no account)
+  | "coming_soon"         // From houseofclarence.uk coming soon page
+  | "referral"            // Referred by existing client
+  | "social"              // Social media
+  | "phone"               // Phone inquiry
+  | "walk_in"             // In-person visit
+  | "other";              // Other source
+
+// Lead source display info
+export const LEAD_SOURCE_INFO: Record<LeadSource, { label: string; description: string; color: string }> = {
+  website_signup: { 
+    label: "Website Account", 
+    description: "Created account on main website", 
+    color: "bg-white/20 text-white" 
+  },
+  website_newsletter: { 
+    label: "Newsletter", 
+    description: "Newsletter signup only", 
+    color: "bg-white/10 text-white/80" 
+  },
+  coming_soon: { 
+    label: "Coming Soon", 
+    description: "From houseofclarence.uk", 
+    color: "bg-white/10 text-white/60" 
+  },
+  referral: { 
+    label: "Referral", 
+    description: "Referred by existing client", 
+    color: "bg-white/30 text-white" 
+  },
+  social: { 
+    label: "Social Media", 
+    description: "From social channels", 
+    color: "bg-white/15 text-white/70" 
+  },
+  phone: { 
+    label: "Phone Inquiry", 
+    description: "Called directly", 
+    color: "bg-white/20 text-white" 
+  },
+  walk_in: { 
+    label: "Walk-in", 
+    description: "Visited in person", 
+    color: "bg-white/25 text-white" 
+  },
+  other: { 
+    label: "Other", 
+    description: "Other source", 
+    color: "bg-white/10 text-white/50" 
+  },
+};
 
 export type LeadPriority = "low" | "normal" | "high" | "urgent";
+
+// Newsletter subscriber (email-only lead)
+export interface NewsletterSubscriber {
+  id: string;
+  email: string;
+  source: LeadSource;
+  subscribedAt: string;
+  isActive: boolean;
+  convertedToAccount: boolean;
+  convertedAt: string | null;
+  profileId: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+}
 
 // Profile from main website
 export interface ClientProfile {
@@ -30,6 +98,11 @@ export interface ClientProfile {
   city: string | null;
   postcode: string | null;
   country: string | null;
+  lead_source: LeadSource | null;
+  referral_source: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -141,11 +214,25 @@ export interface LeadActivity {
 export interface LeadStats {
   total: number;
   byStatus: Record<LeadStatus, number>;
+  bySource: Record<LeadSource, number>;
   newThisWeek: number;
   newThisMonth: number;
   conversionRate: number;
   avgSelectionValue: number;
   totalPipelineValue: number;
+  // Newsletter specific stats
+  newsletterSubscribers: number;
+  newsletterConversions: number;
+  newsletterConversionRate: number;
+}
+
+// Source statistics for analytics
+export interface SourceStats {
+  source: LeadSource;
+  count: number;
+  converted: number;
+  conversionRate: number;
+  totalValue: number;
 }
 
 // Status display info

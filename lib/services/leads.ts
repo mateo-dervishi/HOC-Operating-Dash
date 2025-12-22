@@ -9,8 +9,8 @@ import {
   LeadPriority,
   LeadSource,
   LeadOutreach,
-  OutreachRecord,
-  NurturingStatus,
+  NewsletterSubscriber,
+  SourceStats,
 } from "@/types/leads";
 
 // Default empty outreach for new leads
@@ -35,6 +35,21 @@ interface PipelineData {
   last_contacted_at?: string | null;
   next_follow_up?: string | null;
   meeting_scheduled_at?: string | null;
+}
+
+// Raw newsletter subscriber from Supabase
+interface RawNewsletterSubscriber {
+  id: string;
+  email: string;
+  source: string;
+  subscribed_at: string;
+  is_active: boolean;
+  converted_to_account: boolean;
+  converted_at: string | null;
+  profile_id: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
 }
 
 // Determine lead status based on available data
@@ -172,9 +187,94 @@ export async function fetchLeadById(id: string): Promise<Lead | null> {
   return leads.find((l) => l.id === id) || null;
 }
 
+// Fetch newsletter subscribers
+export async function fetchNewsletterSubscribers(): Promise<NewsletterSubscriber[]> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase
+    .from("newsletter_subscribers")
+    .select("*")
+    .order("subscribed_at", { ascending: false });
+  
+  if (error) {
+    console.error("Error fetching newsletter subscribers:", error);
+    return [];
+  }
+  
+  return (data || []).map((row: RawNewsletterSubscriber) => ({
+    id: row.id,
+    email: row.email,
+    source: row.source as LeadSource,
+    subscribedAt: row.subscribed_at,
+    isActive: row.is_active,
+    convertedToAccount: row.converted_to_account,
+    convertedAt: row.converted_at,
+    profileId: row.profile_id,
+    utmSource: row.utm_source,
+    utmMedium: row.utm_medium,
+    utmCampaign: row.utm_campaign,
+  }));
+}
+
+// Get lead source statistics
+export async function fetchSourceStats(): Promise<SourceStats[]> {
+  const leads = await fetchLeads();
+  const subscribers = await fetchNewsletterSubscribers();
+  
+  const sourceMap = new Map<LeadSource, SourceStats>();
+  
+  // Initialize all sources
+  const allSources: LeadSource[] = [
+    "website_signup", "website_newsletter", "coming_soon", 
+    "referral", "social", "phone", "walk_in", "other"
+  ];
+  
+  allSources.forEach(source => {
+    sourceMap.set(source, {
+      source,
+      count: 0,
+      converted: 0,
+      conversionRate: 0,
+      totalValue: 0,
+    });
+  });
+  
+  // Count leads by source
+  leads.forEach(lead => {
+    const source = lead.source || "website_signup";
+    const stats = sourceMap.get(source)!;
+    stats.count++;
+    stats.totalValue += lead.selectionValue;
+    
+    // Count as converted if they've submitted or beyond
+    const convertedStatuses: LeadStatus[] = [
+      "submitted", "contacted", "meeting_scheduled", "quoted",
+      "deposit_paid", "in_production", "ready_delivery", "completed"
+    ];
+    if (convertedStatuses.includes(lead.status)) {
+      stats.converted++;
+    }
+  });
+  
+  // Add newsletter-only subscribers
+  const unconvertedSubscribers = subscribers.filter(s => !s.convertedToAccount);
+  const newsletterStats = sourceMap.get("website_newsletter")!;
+  newsletterStats.count += unconvertedSubscribers.length;
+  
+  // Calculate conversion rates
+  sourceMap.forEach((stats) => {
+    if (stats.count > 0) {
+      stats.conversionRate = (stats.converted / stats.count) * 100;
+    }
+  });
+  
+  return Array.from(sourceMap.values()).filter(s => s.count > 0);
+}
+
 // Calculate lead statistics
 export async function fetchLeadStats(): Promise<LeadStats> {
   const leads = await fetchLeads();
+  const subscribers = await fetchNewsletterSubscribers();
   
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -184,6 +284,16 @@ export async function fetchLeadStats(): Promise<LeadStats> {
     acc[lead.status] = (acc[lead.status] || 0) + 1;
     return acc;
   }, {} as Record<LeadStatus, number>);
+  
+  const bySource = leads.reduce((acc, lead) => {
+    const source = lead.source || "website_signup";
+    acc[source] = (acc[source] || 0) + 1;
+    return acc;
+  }, {} as Record<LeadSource, number>);
+  
+  // Add newsletter-only subscribers to source count
+  const unconvertedNewsletterCount = subscribers.filter(s => !s.convertedToAccount).length;
+  bySource["website_newsletter"] = (bySource["website_newsletter"] || 0) + unconvertedNewsletterCount;
   
   const newThisWeek = leads.filter(
     (l) => new Date(l.createdAt) > weekAgo
@@ -209,14 +319,25 @@ export async function fetchLeadStats(): Promise<LeadStats> {
   const pipelineLeads = leads.filter((l) => activeStatuses.includes(l.status));
   const totalPipelineValue = pipelineLeads.reduce((sum, l) => sum + l.selectionValue, 0);
   
+  // Newsletter stats
+  const totalSubscribers = subscribers.length;
+  const convertedSubscribers = subscribers.filter(s => s.convertedToAccount).length;
+  const newsletterConversionRate = totalSubscribers > 0 
+    ? (convertedSubscribers / totalSubscribers) * 100 
+    : 0;
+  
   return {
     total,
     byStatus,
+    bySource,
     newThisWeek,
     newThisMonth,
     conversionRate,
     avgSelectionValue,
     totalPipelineValue,
+    newsletterSubscribers: totalSubscribers,
+    newsletterConversions: convertedSubscribers,
+    newsletterConversionRate,
   };
 }
 
@@ -325,6 +446,11 @@ export function getMockLeads(): Lead[] {
       city: "London",
       postcode: "W8 4PX",
       country: "United Kingdom",
+      lead_source: "website_signup",
+      referral_source: null,
+      utm_source: "google",
+      utm_medium: "organic",
+      utm_campaign: null,
       created_at: "2024-12-15T10:00:00Z",
       updated_at: "2024-12-20T14:30:00Z",
     },
@@ -340,6 +466,11 @@ export function getMockLeads(): Lead[] {
       city: "London",
       postcode: "SW3 5RH",
       country: "United Kingdom",
+      lead_source: "website_newsletter",
+      referral_source: null,
+      utm_source: null,
+      utm_medium: null,
+      utm_campaign: null,
       created_at: "2024-12-18T09:15:00Z",
       updated_at: "2024-12-21T11:00:00Z",
     },
@@ -355,6 +486,11 @@ export function getMockLeads(): Lead[] {
       city: "London",
       postcode: "W1K 2AB",
       country: "United Kingdom",
+      lead_source: "referral",
+      referral_source: "Michael Brown - existing client",
+      utm_source: null,
+      utm_medium: null,
+      utm_campaign: null,
       created_at: "2024-12-10T16:45:00Z",
       updated_at: "2024-12-19T09:20:00Z",
     },
@@ -370,6 +506,11 @@ export function getMockLeads(): Lead[] {
       city: "London",
       postcode: "W11 3JQ",
       country: "United Kingdom",
+      lead_source: "website_signup",
+      referral_source: null,
+      utm_source: "instagram",
+      utm_medium: "social",
+      utm_campaign: "winter_collection",
       created_at: "2024-12-20T08:30:00Z",
       updated_at: "2024-12-20T08:30:00Z",
     },
@@ -385,6 +526,11 @@ export function getMockLeads(): Lead[] {
       city: "London",
       postcode: "SW1X 8NH",
       country: "United Kingdom",
+      lead_source: "website_signup",
+      referral_source: null,
+      utm_source: "google",
+      utm_medium: "cpc",
+      utm_campaign: "office_furniture",
       created_at: "2024-11-28T14:00:00Z",
       updated_at: "2024-12-15T16:45:00Z",
     },
@@ -400,6 +546,11 @@ export function getMockLeads(): Lead[] {
       city: "London",
       postcode: "TW10 6RN",
       country: "United Kingdom",
+      lead_source: "referral",
+      referral_source: "David Thompson",
+      utm_source: null,
+      utm_medium: null,
+      utm_campaign: null,
       created_at: "2024-12-05T11:20:00Z",
       updated_at: "2024-12-18T10:00:00Z",
     },
@@ -415,6 +566,11 @@ export function getMockLeads(): Lead[] {
       city: "London",
       postcode: "NW3 1RE",
       country: "United Kingdom",
+      lead_source: "social",
+      referral_source: null,
+      utm_source: "facebook",
+      utm_medium: "paid",
+      utm_campaign: "lighting_promo",
       created_at: "2024-12-22T09:00:00Z",
       updated_at: "2024-12-22T09:00:00Z",
     },
@@ -430,6 +586,11 @@ export function getMockLeads(): Lead[] {
       city: "London",
       postcode: "NW1 8YD",
       country: "United Kingdom",
+      lead_source: "phone",
+      referral_source: null,
+      utm_source: null,
+      utm_medium: null,
+      utm_campaign: null,
       created_at: "2024-12-12T13:30:00Z",
       updated_at: "2024-12-20T15:00:00Z",
     },
@@ -441,7 +602,7 @@ export function getMockLeads(): Lead[] {
       profile: mockProfiles[0],
       status: "submitted",
       priority: "high",
-      source: "website",
+      source: "website_signup",
       selectionItems: [
         { id: "s1", profile_id: "1", product_slug: "clarence-sofa", product_name: "Clarence Sofa - Velvet Navy", product_image: null, product_category: "Furniture", colour: "Navy", quantity: 1, unit_price: 8500, notes: null, created_at: "2024-12-15T10:30:00Z", updated_at: "2024-12-15T10:30:00Z" },
         { id: "s2", profile_id: "1", product_slug: "monarch-armchair", product_name: "Monarch Armchair - Leather Tan", product_image: null, product_category: "Furniture", colour: "Tan", quantity: 2, unit_price: 3200, notes: null, created_at: "2024-12-15T10:35:00Z", updated_at: "2024-12-15T10:35:00Z" },
@@ -468,7 +629,7 @@ export function getMockLeads(): Lead[] {
       profile: mockProfiles[1],
       status: "meeting_scheduled",
       priority: "high",
-      source: "website",
+      source: "website_newsletter",
       selectionItems: [
         { id: "s4", profile_id: "2", product_slug: "calacatta-marble-tile", product_name: "Calacatta Marble Tile", product_image: null, product_category: "Tiling", colour: "White/Grey", quantity: 25, unit_price: 180, notes: "For bathroom walls", created_at: "2024-12-18T09:30:00Z", updated_at: "2024-12-18T09:30:00Z" },
         { id: "s5", profile_id: "2", product_slug: "freestanding-bath", product_name: "Stone Sanctuary Freestanding Bath", product_image: null, product_category: "Bathroom", colour: "White", quantity: 1, unit_price: 4200, notes: null, created_at: "2024-12-18T09:45:00Z", updated_at: "2024-12-18T09:45:00Z" },
@@ -546,7 +707,7 @@ export function getMockLeads(): Lead[] {
       profile: mockProfiles[3],
       status: "registered",
       priority: "low",
-      source: "website",
+      source: "website_signup",
       selectionItems: [],
       selectionValue: 0,
       selectionCount: 0,
@@ -577,7 +738,7 @@ export function getMockLeads(): Lead[] {
       profile: mockProfiles[4],
       status: "in_production",
       priority: "normal",
-      source: "website",
+      source: "website_signup",
       selectionItems: [
         { id: "s9", profile_id: "5", product_slug: "executive-desk", product_name: "Executive Desk - Mahogany", product_image: null, product_category: "Furniture", colour: "Mahogany", quantity: 1, unit_price: 5500, notes: null, created_at: "2024-11-28T14:15:00Z", updated_at: "2024-11-28T14:15:00Z" },
         { id: "s10", profile_id: "5", product_slug: "leather-office-chair", product_name: "Leather Office Chair", product_image: null, product_category: "Furniture", colour: "Black", quantity: 1, unit_price: 2200, notes: null, created_at: "2024-11-28T14:20:00Z", updated_at: "2024-11-28T14:20:00Z" },
@@ -654,7 +815,7 @@ export function getMockLeads(): Lead[] {
       profile: mockProfiles[6],
       status: "browsing",
       priority: "normal",
-      source: "website",
+      source: "social",
       selectionItems: [
         { id: "s15", profile_id: "7", product_slug: "wall-sconce-modern", product_name: "Modern Wall Sconce", product_image: null, product_category: "Lighting", colour: "Black", quantity: 4, unit_price: 220, notes: null, created_at: "2024-12-22T09:15:00Z", updated_at: "2024-12-22T09:15:00Z" },
       ],
@@ -687,7 +848,7 @@ export function getMockLeads(): Lead[] {
       profile: mockProfiles[7],
       status: "contacted",
       priority: "normal",
-      source: "website",
+      source: "phone",
       selectionItems: [
         { id: "s16", profile_id: "8", product_slug: "clarence-sofa-emerald", product_name: "Clarence Sofa - Velvet Emerald", product_image: null, product_category: "Furniture", colour: "Emerald", quantity: 1, unit_price: 8500, notes: null, created_at: "2024-12-12T13:45:00Z", updated_at: "2024-12-12T13:45:00Z" },
         { id: "s17", profile_id: "8", product_slug: "accent-pillows", product_name: "Accent Pillow Set", product_image: null, product_category: "Furniture", colour: "Gold/Cream", quantity: 2, unit_price: 450, notes: null, created_at: "2024-12-12T13:50:00Z", updated_at: "2024-12-12T13:50:00Z" },
@@ -724,6 +885,88 @@ export function getMockLeads(): Lead[] {
   return mockLeads;
 }
 
+// Get mock newsletter subscribers
+export function getMockNewsletterSubscribers(): NewsletterSubscriber[] {
+  return [
+    {
+      id: "ns1",
+      email: "alex.walker@email.com",
+      source: "website_newsletter",
+      subscribedAt: "2024-12-18T14:30:00Z",
+      isActive: true,
+      convertedToAccount: false,
+      convertedAt: null,
+      profileId: null,
+      utmSource: "google",
+      utmMedium: "organic",
+      utmCampaign: null,
+    },
+    {
+      id: "ns2",
+      email: "sophie.jones@gmail.com",
+      source: "website_newsletter",
+      subscribedAt: "2024-12-20T09:15:00Z",
+      isActive: true,
+      convertedToAccount: false,
+      convertedAt: null,
+      profileId: null,
+      utmSource: "instagram",
+      utmMedium: "social",
+      utmCampaign: "winter_launch",
+    },
+    {
+      id: "ns3",
+      email: "tom.harrison@outlook.com",
+      source: "website_newsletter",
+      subscribedAt: "2024-12-21T16:45:00Z",
+      isActive: true,
+      convertedToAccount: false,
+      convertedAt: null,
+      profileId: null,
+      utmSource: null,
+      utmMedium: null,
+      utmCampaign: null,
+    },
+    {
+      id: "ns4",
+      email: "sarah.mitchell@gmail.com", // Same email as lead #2
+      source: "website_newsletter",
+      subscribedAt: "2024-12-10T11:00:00Z",
+      isActive: true,
+      convertedToAccount: true,
+      convertedAt: "2024-12-18T09:15:00Z",
+      profileId: "2",
+      utmSource: null,
+      utmMedium: null,
+      utmCampaign: null,
+    },
+    {
+      id: "ns5",
+      email: "mark.davies@company.co.uk",
+      source: "website_newsletter",
+      subscribedAt: "2024-12-19T12:30:00Z",
+      isActive: true,
+      convertedToAccount: false,
+      convertedAt: null,
+      profileId: null,
+      utmSource: "facebook",
+      utmMedium: "paid",
+      utmCampaign: "december_promo",
+    },
+  ];
+}
+
+// Get mock source stats
+export function getMockSourceStats(): SourceStats[] {
+  return [
+    { source: "website_signup", count: 3, converted: 2, conversionRate: 66.7, totalValue: 42200 },
+    { source: "website_newsletter", count: 4, converted: 1, conversionRate: 25.0, totalValue: 8700 },
+    { source: "referral", count: 2, converted: 2, conversionRate: 100.0, totalValue: 17880 },
+    { source: "social", count: 1, converted: 0, conversionRate: 0.0, totalValue: 880 },
+    { source: "phone", count: 1, converted: 1, conversionRate: 100.0, totalValue: 9400 },
+  ];
+}
+
 // Get mock stats
 export function getMockLeadStats(): LeadStats {
   const leads = getMockLeads();
@@ -733,14 +976,28 @@ export function getMockLeadStats(): LeadStats {
     return acc;
   }, {} as Record<LeadStatus, number>);
   
+  const bySource = leads.reduce((acc, lead) => {
+    acc[lead.source] = (acc[lead.source] || 0) + 1;
+    return acc;
+  }, {} as Record<LeadSource, number>);
+  
+  // Add newsletter-only subscribers
+  const subscribers = getMockNewsletterSubscribers();
+  const unconvertedSubscribers = subscribers.filter(s => !s.convertedToAccount);
+  bySource["website_newsletter"] = (bySource["website_newsletter"] || 0) + unconvertedSubscribers.length;
+  
   return {
     total: 8,
     byStatus,
+    bySource,
     newThisWeek: 3,
     newThisMonth: 8,
     conversionRate: 12.5,
     avgSelectionValue: 8595,
     totalPipelineValue: 51880,
+    newsletterSubscribers: subscribers.length,
+    newsletterConversions: subscribers.filter(s => s.convertedToAccount).length,
+    newsletterConversionRate: 20.0,
   };
 }
 
