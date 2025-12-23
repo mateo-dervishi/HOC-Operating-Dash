@@ -94,18 +94,10 @@ interface OutreachRow {
   follow_up_date: string | null;
 }
 
-// Check if running in development mode
-const isDev = process.env.NODE_ENV === "development";
-
 /**
  * Fetch all marketing leads (not submitted)
  */
 export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
-  // Use mock data in development if Supabase isn't set up
-  if (isDev) {
-    return getMockMarketingLeads();
-  }
-
   const supabase = createClient();
   
   try {
@@ -116,7 +108,7 @@ export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
     
     if (profilesError) {
       console.error("Error fetching profiles:", profilesError);
-      return getMockMarketingLeads();
+      return [];
     }
 
     // 2. Fetch all submissions to exclude submitted clients
@@ -230,7 +222,7 @@ export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
     return leads;
   } catch (error) {
     console.error("Error fetching marketing leads:", error);
-    return getMockMarketingLeads();
+    return [];
   }
 }
 
@@ -241,8 +233,6 @@ export async function updateLeadInterest(
   leadId: string, 
   interest: InterestLevel
 ): Promise<boolean> {
-  if (isDev) return true;
-
   const supabase = createClient();
   
   const { error } = await (supabase as any)
@@ -263,8 +253,6 @@ export async function logOutreach(
   notes?: string,
   followUpDate?: string
 ): Promise<boolean> {
-  if (isDev) return true;
-
   const supabase = createClient();
   
   const { error } = await (supabase as any)
@@ -367,199 +355,4 @@ function normalizeInterest(interest: string | null): InterestLevel {
   return "warm"; // Default
 }
 
-// Mock data for development
-function getMockMarketingLeads(): MarketingLead[] {
-  return [
-    {
-      id: "1",
-      name: "James Richardson",
-      email: "james@richardson.com",
-      phone: "+44 7700 900123",
-      source: "website_signup",
-      status: "browsing",
-      interest: "hot",
-      selectionCount: 8,
-      selectionValue: 45000,
-      createdAt: "2024-12-01T10:00:00Z",
-      lastActivityAt: "2024-12-20T14:30:00Z",
-      lastOutreachAt: null,
-      nextFollowUp: null,
-      notes: null,
-      tags: ["high-value"],
-      isNewsletterOnly: false,
-      convertedToAccount: true,
-    },
-    {
-      id: "2",
-      name: "Sarah Mitchell",
-      email: "sarah@mitchellhome.co.uk",
-      phone: "+44 7700 900456",
-      source: "referral",
-      status: "browsing",
-      interest: "warm",
-      selectionCount: 3,
-      selectionValue: 12500,
-      createdAt: "2024-12-10T09:00:00Z",
-      lastActivityAt: "2024-12-18T11:20:00Z",
-      lastOutreachAt: "2024-12-15T10:00:00Z",
-      nextFollowUp: "2024-12-28",
-      notes: null,
-      tags: [],
-      isNewsletterOnly: false,
-      convertedToAccount: true,
-    },
-    {
-      id: "3",
-      name: "David Thompson",
-      email: "david.t@email.com",
-      phone: null,
-      source: "website_signup",
-      status: "registered",
-      interest: "cold",
-      selectionCount: 0,
-      selectionValue: 0,
-      createdAt: "2024-11-15T14:00:00Z",
-      lastActivityAt: "2024-11-15T14:00:00Z",
-      lastOutreachAt: null,
-      nextFollowUp: null,
-      notes: null,
-      tags: ["needs-follow-up"],
-      isNewsletterOnly: false,
-      convertedToAccount: true,
-    },
-    {
-      id: "4",
-      name: "emma.w",
-      email: "emma.w@gmail.com",
-      phone: null,
-      source: "website_newsletter",
-      status: "newsletter_only",
-      interest: "warm",
-      selectionCount: 0,
-      selectionValue: 0,
-      createdAt: "2024-12-05T16:00:00Z",
-      lastActivityAt: "2024-12-05T16:00:00Z",
-      lastOutreachAt: null,
-      nextFollowUp: null,
-      notes: null,
-      tags: ["newsletter"],
-      isNewsletterOnly: true,
-      convertedToAccount: false,
-    },
-    {
-      id: "5",
-      name: "Michael Brown",
-      email: "m.brown@company.co.uk",
-      phone: "+44 7700 900789",
-      source: "phone",
-      status: "browsing",
-      interest: "hot",
-      selectionCount: 5,
-      selectionValue: 28000,
-      createdAt: "2024-12-18T10:30:00Z",
-      lastActivityAt: "2024-12-21T09:15:00Z",
-      lastOutreachAt: "2024-12-19T11:00:00Z",
-      nextFollowUp: null,
-      notes: "Called, very interested",
-      tags: ["phone-inquiry"],
-      isNewsletterOnly: false,
-      convertedToAccount: true,
-    },
-    {
-      id: "6",
-      name: "Sophie Clark",
-      email: "sophie.clark@email.com",
-      phone: null,
-      source: "social",
-      status: "browsing",
-      interest: "warm",
-      selectionCount: 2,
-      selectionValue: 8500,
-      createdAt: "2024-12-12T13:00:00Z",
-      lastActivityAt: "2024-12-19T15:45:00Z",
-      lastOutreachAt: null,
-      nextFollowUp: null,
-      notes: null,
-      tags: ["instagram"],
-      isNewsletterOnly: false,
-      convertedToAccount: true,
-    },
-    {
-      id: "7",
-      name: "oliver",
-      email: "oliver@davies.net",
-      phone: null,
-      source: "coming_soon",
-      status: "newsletter_only",
-      interest: "cold",
-      selectionCount: 0,
-      selectionValue: 0,
-      createdAt: "2024-10-20T08:00:00Z",
-      lastActivityAt: "2024-10-20T08:00:00Z",
-      lastOutreachAt: null,
-      nextFollowUp: null,
-      notes: null,
-      tags: ["coming-soon"],
-      isNewsletterOnly: true,
-      convertedToAccount: false,
-    },
-    {
-      id: "8",
-      name: "Charlotte Wilson",
-      email: "c.wilson@business.com",
-      phone: "+44 7700 900321",
-      source: "walk_in",
-      status: "browsing",
-      interest: "hot",
-      selectionCount: 12,
-      selectionValue: 67000,
-      createdAt: "2024-12-15T11:00:00Z",
-      lastActivityAt: "2024-12-21T16:30:00Z",
-      lastOutreachAt: "2024-12-20T14:00:00Z",
-      nextFollowUp: "2024-12-23",
-      notes: "Visited showroom, loved the collection",
-      tags: ["showroom-visit", "high-value"],
-      isNewsletterOnly: false,
-      convertedToAccount: true,
-    },
-    {
-      id: "9",
-      name: "George Taylor",
-      email: "george.t@outlook.com",
-      phone: null,
-      source: "website_signup",
-      status: "registered",
-      interest: "cold",
-      selectionCount: 0,
-      selectionValue: 0,
-      createdAt: "2024-11-28T17:00:00Z",
-      lastActivityAt: "2024-11-30T10:00:00Z",
-      lastOutreachAt: null,
-      nextFollowUp: null,
-      notes: null,
-      tags: [],
-      isNewsletterOnly: false,
-      convertedToAccount: true,
-    },
-    {
-      id: "10",
-      name: "Isabella Moore",
-      email: "isabella.m@email.co.uk",
-      phone: null,
-      source: "referral",
-      status: "browsing",
-      interest: "warm",
-      selectionCount: 4,
-      selectionValue: 19500,
-      createdAt: "2024-12-08T12:00:00Z",
-      lastActivityAt: "2024-12-17T14:20:00Z",
-      lastOutreachAt: null,
-      nextFollowUp: null,
-      notes: "Referred by James Richardson",
-      tags: ["referral-program"],
-      isNewsletterOnly: false,
-      convertedToAccount: true,
-    },
-  ];
-}
 

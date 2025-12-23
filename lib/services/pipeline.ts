@@ -127,18 +127,10 @@ interface QuoteRow {
   total_amount: number;
 }
 
-// Check if running in development mode
-const isDev = process.env.NODE_ENV === "development";
-
 /**
  * Fetch all pipeline clients (submitted only)
  */
 export async function fetchPipelineClients(): Promise<PipelineClient[]> {
-  // Use mock data in development if Supabase isn't set up
-  if (isDev) {
-    return getMockPipelineClients();
-  }
-
   const supabase = createClient();
   
   try {
@@ -150,11 +142,11 @@ export async function fetchPipelineClients(): Promise<PipelineClient[]> {
     
     if (pipelineError) {
       console.error("Error fetching pipeline:", pipelineError);
-      return getMockPipelineClients();
+      return [];
     }
 
     if (!pipelineData || pipelineData.length === 0) {
-      return getMockPipelineClients();
+      return [];
     }
 
     // 2. Get all client IDs from pipeline
@@ -300,7 +292,7 @@ export async function fetchPipelineClients(): Promise<PipelineClient[]> {
     return clients;
   } catch (error) {
     console.error("Error fetching pipeline clients:", error);
-    return getMockPipelineClients();
+    return [];
   }
 }
 
@@ -311,8 +303,6 @@ export async function updatePipelineStage(
   pipelineId: string,
   newStage: PipelineStage
 ): Promise<boolean> {
-  if (isDev) return true;
-
   const supabase = createClient();
   
   const { error } = await (supabase as any)
@@ -333,8 +323,6 @@ export async function updatePipelinePriority(
   pipelineId: string,
   priority: Priority
 ): Promise<boolean> {
-  if (isDev) return true;
-
   const supabase = createClient();
   
   const { error } = await (supabase as any)
@@ -355,8 +343,6 @@ export async function recordPayment(
   amount: number,
   reference?: string
 ): Promise<boolean> {
-  if (isDev) return true;
-
   const supabase = createClient();
   
   const { error } = await (supabase as any)
@@ -455,217 +441,4 @@ function normalizePriority(priority: string | null): Priority {
   return "normal";
 }
 
-// Mock data for development
-function getMockPipelineClients(): PipelineClient[] {
-  return [
-    {
-      id: "p1",
-      profileId: "1",
-      name: "James Richardson",
-      email: "james@richardson.com",
-      phone: "+44 7700 900123",
-      stage: "quoted",
-      priority: "high",
-      source: "website_signup",
-      selectionCount: 8,
-      selectionValue: 45000,
-      submittedAt: "2024-12-15T10:00:00Z",
-      lastContactedAt: "2024-12-20T14:30:00Z",
-      meetingDate: "2024-12-18T11:00:00Z",
-      quoteId: "q1",
-      quoteValue: 42500,
-      orderId: null,
-      depositPaid: null,
-      productionPaid: null,
-      finalPaid: null,
-      totalPaid: 0,
-      totalDue: 42500,
-      assignedTo: "admin1",
-      assignedToName: "Sarah",
-      notes: null,
-    },
-    {
-      id: "p2",
-      profileId: "2",
-      name: "Charlotte Wilson",
-      email: "c.wilson@business.com",
-      phone: "+44 7700 900321",
-      stage: "deposit_paid",
-      priority: "normal",
-      source: "walk_in",
-      selectionCount: 12,
-      selectionValue: 67000,
-      submittedAt: "2024-12-10T09:00:00Z",
-      lastContactedAt: "2024-12-19T16:00:00Z",
-      meetingDate: "2024-12-12T14:00:00Z",
-      quoteId: "q2",
-      quoteValue: 64000,
-      orderId: "o1",
-      depositPaid: 12800,
-      productionPaid: null,
-      finalPaid: null,
-      totalPaid: 12800,
-      totalDue: 51200,
-      assignedTo: "admin2",
-      assignedToName: "Tom",
-      notes: null,
-    },
-    {
-      id: "p3",
-      profileId: "3",
-      name: "Michael Brown",
-      email: "m.brown@company.co.uk",
-      phone: "+44 7700 900789",
-      stage: "submitted",
-      priority: "urgent",
-      source: "phone",
-      selectionCount: 5,
-      selectionValue: 28000,
-      submittedAt: "2024-12-21T09:30:00Z",
-      lastContactedAt: null,
-      meetingDate: null,
-      quoteId: null,
-      quoteValue: null,
-      orderId: null,
-      depositPaid: null,
-      productionPaid: null,
-      finalPaid: null,
-      totalPaid: 0,
-      totalDue: 28000,
-      assignedTo: null,
-      assignedToName: null,
-      notes: "Called earlier, very keen to proceed",
-    },
-    {
-      id: "p4",
-      profileId: "4",
-      name: "Isabella Moore",
-      email: "isabella.m@email.co.uk",
-      phone: null,
-      stage: "contacted",
-      priority: "normal",
-      source: "referral",
-      selectionCount: 4,
-      selectionValue: 19500,
-      submittedAt: "2024-12-18T12:00:00Z",
-      lastContactedAt: "2024-12-20T10:30:00Z",
-      meetingDate: null,
-      quoteId: null,
-      quoteValue: null,
-      orderId: null,
-      depositPaid: null,
-      productionPaid: null,
-      finalPaid: null,
-      totalPaid: 0,
-      totalDue: 19500,
-      assignedTo: "admin1",
-      assignedToName: "Sarah",
-      notes: "Referred by James Richardson",
-    },
-    {
-      id: "p5",
-      profileId: "5",
-      name: "Oliver Harris",
-      email: "oliver.h@email.com",
-      phone: "+44 7700 900555",
-      stage: "meeting_scheduled",
-      priority: "normal",
-      source: "website_signup",
-      selectionCount: 6,
-      selectionValue: 32000,
-      submittedAt: "2024-12-14T11:00:00Z",
-      lastContactedAt: "2024-12-16T15:00:00Z",
-      meetingDate: "2024-12-23T10:00:00Z",
-      quoteId: null,
-      quoteValue: null,
-      orderId: null,
-      depositPaid: null,
-      productionPaid: null,
-      finalPaid: null,
-      totalPaid: 0,
-      totalDue: 32000,
-      assignedTo: "admin2",
-      assignedToName: "Tom",
-      notes: null,
-    },
-    {
-      id: "p6",
-      profileId: "6",
-      name: "Emily Watson",
-      email: "emily.w@gmail.com",
-      phone: null,
-      stage: "in_production",
-      priority: "normal",
-      source: "website_signup",
-      selectionCount: 9,
-      selectionValue: 52000,
-      submittedAt: "2024-11-20T14:00:00Z",
-      lastContactedAt: "2024-12-15T11:00:00Z",
-      meetingDate: "2024-11-25T14:00:00Z",
-      quoteId: "q3",
-      quoteValue: 49500,
-      orderId: "o2",
-      depositPaid: 9900,
-      productionPaid: 34650,
-      finalPaid: null,
-      totalPaid: 44550,
-      totalDue: 4950,
-      assignedTo: "admin1",
-      assignedToName: "Sarah",
-      notes: null,
-    },
-    {
-      id: "p7",
-      profileId: "7",
-      name: "William Taylor",
-      email: "w.taylor@business.co.uk",
-      phone: "+44 7700 900666",
-      stage: "ready_delivery",
-      priority: "high",
-      source: "referral",
-      selectionCount: 7,
-      selectionValue: 38000,
-      submittedAt: "2024-11-01T10:00:00Z",
-      lastContactedAt: "2024-12-18T09:00:00Z",
-      meetingDate: "2024-11-05T11:00:00Z",
-      quoteId: "q4",
-      quoteValue: 36000,
-      orderId: "o3",
-      depositPaid: 7200,
-      productionPaid: 25200,
-      finalPaid: null,
-      totalPaid: 32400,
-      totalDue: 3600,
-      assignedTo: "admin2",
-      assignedToName: "Tom",
-      notes: "Delivery scheduled for Dec 28",
-    },
-    {
-      id: "p8",
-      profileId: "8",
-      name: "Grace Anderson",
-      email: "grace.a@email.com",
-      phone: null,
-      stage: "completed",
-      priority: "normal",
-      source: "website_signup",
-      selectionCount: 5,
-      selectionValue: 24000,
-      submittedAt: "2024-10-15T09:00:00Z",
-      lastContactedAt: "2024-12-01T14:00:00Z",
-      meetingDate: "2024-10-20T10:00:00Z",
-      quoteId: "q5",
-      quoteValue: 23000,
-      orderId: "o4",
-      depositPaid: 4600,
-      productionPaid: 16100,
-      finalPaid: 2300,
-      totalPaid: 23000,
-      totalDue: 0,
-      assignedTo: "admin1",
-      assignedToName: "Sarah",
-      notes: null,
-    },
-  ];
-}
 
