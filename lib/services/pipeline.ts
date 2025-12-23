@@ -315,7 +315,7 @@ export async function updatePipelineStage(
 
   const supabase = createClient();
   
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("client_pipeline")
     .update({ 
       stage: newStage,
@@ -337,7 +337,7 @@ export async function updatePipelinePriority(
 
   const supabase = createClient();
   
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("client_pipeline")
     .update({ priority })
     .eq("id", pipelineId);
@@ -359,7 +359,7 @@ export async function recordPayment(
 
   const supabase = createClient();
   
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("client_payments")
     .insert({
       client_id: clientId,

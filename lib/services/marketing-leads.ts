@@ -245,7 +245,7 @@ export async function updateLeadInterest(
 
   const supabase = createClient();
   
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("profiles")
     .update({ interest_level: interest })
     .eq("id", leadId);
@@ -267,7 +267,7 @@ export async function logOutreach(
 
   const supabase = createClient();
   
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("lead_outreach")
     .insert({
       client_id: leadId,
