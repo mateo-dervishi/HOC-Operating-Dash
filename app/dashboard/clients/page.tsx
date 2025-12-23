@@ -3,6 +3,25 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverEvent,
+  useDroppable,
+} from "@dnd-kit/core";
+import {
+  useSortable,
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   Search,
   Phone,
   Mail,
@@ -19,6 +38,7 @@ import {
   Users,
   RefreshCw,
   Loader2,
+  GripVertical,
 } from "lucide-react";
 import {
   fetchPipelineClients,
@@ -116,77 +136,162 @@ function PipelineStatsComponent({ stats, isLoading }: { stats: PipelineStats | n
   );
 }
 
-function ClientCard({
+// Sortable Client Card
+function SortableClientCard({
   client,
   onClick,
 }: {
   client: PipelineClient;
   onClick: () => void;
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: client.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   const paymentPercentage = calculatePaymentPercentage(client);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      onClick={onClick}
-      className={`bg-white/5 border ${PRIORITY_INFO[client.priority].color} rounded-lg p-4 cursor-pointer hover:bg-white/10 transition-colors`}
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`bg-white/5 border ${PRIORITY_INFO[client.priority].color} rounded-lg p-4 cursor-grab active:cursor-grabbing hover:bg-white/10 transition-colors ${isDragging ? "shadow-lg shadow-white/10 ring-2 ring-white/20" : ""}`}
     >
-      {/* Priority indicator */}
-      {client.priority !== "normal" && (
-        <div className={`text-xs mb-2 ${client.priority === "urgent" ? "text-red-400" : "text-yellow-400"}`}>
-          {client.priority === "urgent" ? "⚡ Urgent" : "⭐ High Priority"}
+      <div className="flex items-start gap-2">
+        {/* Drag Handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="mt-1 text-white/30 hover:text-white/60 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="w-4 h-4" />
         </div>
-      )}
 
-      {/* Name & Contact */}
-      <div className="mb-3">
-        <h3 className="font-light text-white">{client.name}</h3>
-        <p className="text-sm text-white/40">{client.email}</p>
-      </div>
+        <div className="flex-1" onClick={onClick}>
+          {/* Priority indicator */}
+          {client.priority !== "normal" && (
+            <div className={`text-xs mb-2 ${client.priority === "urgent" ? "text-red-400" : "text-yellow-400"}`}>
+              {client.priority === "urgent" ? "⚡ Urgent" : "⭐ High Priority"}
+            </div>
+          )}
 
-      {/* Selection Info */}
-      <div className="flex items-center justify-between text-sm mb-3">
-        <span className="text-white/60">{client.selectionCount} items</span>
-        <span className="text-white">{formatCurrency(client.quoteValue || client.selectionValue)}</span>
-      </div>
-
-      {/* Payment Progress (if applicable) */}
-      {client.totalPaid > 0 && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-xs text-white/40 mb-1">
-            <span>Payment</span>
-            <span>{paymentPercentage}%</span>
+          {/* Name & Contact */}
+          <div className="mb-3">
+            <h3 className="font-light text-white">{client.name}</h3>
+            <p className="text-sm text-white/40">{client.email}</p>
           </div>
-          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-green-500 rounded-full transition-all"
-              style={{ width: `${paymentPercentage}%` }}
-            />
+
+          {/* Selection Info */}
+          <div className="flex items-center justify-between text-sm mb-3">
+            <span className="text-white/60">{client.selectionCount} items</span>
+            <span className="text-white">{formatCurrency(client.quoteValue || client.selectionValue)}</span>
+          </div>
+
+          {/* Payment Progress (if applicable) */}
+          {client.totalPaid > 0 && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-xs text-white/40 mb-1">
+                <span>Payment</span>
+                <span>{paymentPercentage}%</span>
+              </div>
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all"
+                  style={{ width: `${paymentPercentage}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Assigned & Date */}
+          <div className="flex items-center justify-between text-xs text-white/40">
+            {client.assignedToName && <span>{client.assignedToName}</span>}
+            <span>{formatDate(client.submittedAt)}</span>
           </div>
         </div>
-      )}
-
-      {/* Assigned & Date */}
-      <div className="flex items-center justify-between text-xs text-white/40">
-        {client.assignedToName && <span>{client.assignedToName}</span>}
-        <span>{formatDate(client.submittedAt)}</span>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
+// Drag Overlay Card (what you see while dragging)
+function DragOverlayCard({ client }: { client: PipelineClient }) {
+  const paymentPercentage = calculatePaymentPercentage(client);
+
+  return (
+    <div
+      className={`bg-white/10 border ${PRIORITY_INFO[client.priority].color} rounded-lg p-4 shadow-2xl shadow-black/50 ring-2 ring-white/30 w-72`}
+    >
+      <div className="flex items-start gap-2">
+        <div className="mt-1 text-white/60">
+          <GripVertical className="w-4 h-4" />
+        </div>
+
+        <div className="flex-1">
+          {client.priority !== "normal" && (
+            <div className={`text-xs mb-2 ${client.priority === "urgent" ? "text-red-400" : "text-yellow-400"}`}>
+              {client.priority === "urgent" ? "⚡ Urgent" : "⭐ High Priority"}
+            </div>
+          )}
+
+          <div className="mb-3">
+            <h3 className="font-light text-white">{client.name}</h3>
+            <p className="text-sm text-white/40">{client.email}</p>
+          </div>
+
+          <div className="flex items-center justify-between text-sm mb-3">
+            <span className="text-white/60">{client.selectionCount} items</span>
+            <span className="text-white">{formatCurrency(client.quoteValue || client.selectionValue)}</span>
+          </div>
+
+          {client.totalPaid > 0 && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-xs text-white/40 mb-1">
+                <span>Payment</span>
+                <span>{paymentPercentage}%</span>
+              </div>
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all"
+                  style={{ width: `${paymentPercentage}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-xs text-white/40">
+            {client.assignedToName && <span>{client.assignedToName}</span>}
+            <span>{formatDate(client.submittedAt)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Droppable Kanban Column
 function KanbanColumn({
   stage,
   clients,
   onClientClick,
+  isOver,
 }: {
   stage: PipelineStage;
   clients: PipelineClient[];
   onClientClick: (client: PipelineClient) => void;
+  isOver?: boolean;
 }) {
+  const { setNodeRef } = useDroppable({ id: stage });
   const stageInfo = STAGE_INFO[stage];
 
   return (
@@ -201,15 +306,26 @@ function KanbanColumn({
         </div>
       </div>
 
-      {/* Cards */}
-      <div className="bg-white/5 border border-white/10 border-t-0 rounded-b-lg p-3 min-h-[400px] space-y-3">
-        <AnimatePresence>
+      {/* Cards Container */}
+      <div
+        ref={setNodeRef}
+        className={`bg-white/5 border border-white/10 border-t-0 rounded-b-lg p-3 min-h-[400px] space-y-3 transition-colors ${
+          isOver ? "bg-white/10 ring-2 ring-white/20 ring-inset" : ""
+        }`}
+      >
+        <SortableContext items={clients.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {clients.map((client) => (
-            <ClientCard key={client.id} client={client} onClick={() => onClientClick(client)} />
+            <SortableClientCard
+              key={client.id}
+              client={client}
+              onClick={() => onClientClick(client)}
+            />
           ))}
-        </AnimatePresence>
+        </SortableContext>
         {clients.length === 0 && (
-          <div className="text-center py-8 text-white/30 text-sm">No clients</div>
+          <div className={`text-center py-8 text-sm transition-colors ${isOver ? "text-white/60" : "text-white/30"}`}>
+            {isOver ? "Drop here" : "No clients"}
+          </div>
         )}
       </div>
     </div>
@@ -517,6 +633,18 @@ export default function ClientPipelinePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClient, setSelectedClient] = useState<PipelineClient | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
 
   // Fetch data on mount
   useEffect(() => {
@@ -563,25 +691,101 @@ export default function ClientPipelinePage() {
     });
   }, [clients, searchQuery, assigneeFilter]);
 
+  // Pipeline stages in order
+  const stages: PipelineStage[] = [
+    "submitted",
+    "contacted",
+    "meeting_scheduled",
+    "quoted",
+    "deposit_paid",
+    "in_production",
+    "ready_delivery",
+    "completed",
+  ];
+
   // Group by stage
   const clientsByStage = useMemo(() => {
-    const stages: PipelineStage[] = [
-      "submitted",
-      "contacted",
-      "meeting_scheduled",
-      "quoted",
-      "deposit_paid",
-      "in_production",
-      "ready_delivery",
-      "completed",
-    ];
     return stages.reduce((acc, stage) => {
       acc[stage] = filteredClients.filter((c) => c.stage === stage);
       return acc;
     }, {} as Record<PipelineStage, PipelineClient[]>);
   }, [filteredClients]);
 
-  // Handle stage change
+  // Get the active client being dragged
+  const activeClient = useMemo(() => {
+    if (!activeId) return null;
+    return clients.find((c) => c.id === activeId) || null;
+  }, [activeId, clients]);
+
+  // Handle drag start
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  // Handle drag over
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (over) {
+      // Check if over is a stage (column)
+      if (stages.includes(over.id as PipelineStage)) {
+        setOverId(over.id as string);
+      } else {
+        // It's over another card, find which stage that card belongs to
+        const overClient = clients.find((c) => c.id === over.id);
+        if (overClient) {
+          setOverId(overClient.stage);
+        }
+      }
+    } else {
+      setOverId(null);
+    }
+  };
+
+  // Handle drag end
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    setActiveId(null);
+    setOverId(null);
+
+    if (!over) return;
+
+    const activeClientId = active.id as string;
+    let newStage: PipelineStage | null = null;
+
+    // Check if dropped on a column
+    if (stages.includes(over.id as PipelineStage)) {
+      newStage = over.id as PipelineStage;
+    } else {
+      // Dropped on a card - find which stage that card belongs to
+      const overClient = clients.find((c) => c.id === over.id);
+      if (overClient) {
+        newStage = overClient.stage;
+      }
+    }
+
+    if (!newStage) return;
+
+    // Find the active client
+    const activeClientData = clients.find((c) => c.id === activeClientId);
+    if (!activeClientData || activeClientData.stage === newStage) return;
+
+    // Optimistic update
+    setClients((prev) =>
+      prev.map((c) => (c.id === activeClientId ? { ...c, stage: newStage! } : c))
+    );
+
+    // Update stats
+    const updatedClients = clients.map((c) =>
+      c.id === activeClientId ? { ...c, stage: newStage! } : c
+    );
+    setStats(getPipelineStats(updatedClients));
+
+    // Persist to database
+    await updatePipelineStage(activeClientId, newStage);
+  };
+
+  // Handle stage change from detail panel
   const handleStageChange = async (clientId: string, newStage: PipelineStage) => {
     // Optimistic update
     setClients((prev) =>
@@ -659,24 +863,41 @@ export default function ClientPipelinePage() {
         </select>
       </div>
 
-      {/* Kanban Board */}
+      {/* Drag hint */}
+      <p className="text-xs text-white/30">💡 Drag cards between columns to update stage</p>
+
+      {/* Kanban Board with DnD */}
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
         </div>
       ) : (
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-4 min-w-max">
-            {(Object.keys(clientsByStage) as PipelineStage[]).map((stage) => (
-              <KanbanColumn
-                key={stage}
-                stage={stage}
-                clients={clientsByStage[stage]}
-                onClientClick={setSelectedClient}
-              />
-            ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="overflow-x-auto pb-4">
+            <div className="flex gap-4 min-w-max">
+              {stages.map((stage) => (
+                <KanbanColumn
+                  key={stage}
+                  stage={stage}
+                  clients={clientsByStage[stage]}
+                  onClientClick={setSelectedClient}
+                  isOver={overId === stage}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+
+          {/* Drag Overlay */}
+          <DragOverlay>
+            {activeClient ? <DragOverlayCard client={activeClient} /> : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* Client Detail Panel */}
