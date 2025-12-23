@@ -4,6 +4,10 @@
  * Handles data fetching for the Leads page (marketing/nurturing view)
  * Shows: registered users, browsing users, newsletter subscribers
  * Does NOT show: submitted clients (those go to Pipeline)
+ * 
+ * SCHEMA NOTE: Main site uses:
+ * - client_selections: { user_id, items (JSON), labels (JSON) }
+ * - selection_submissions: { user_id, items (JSON), total_items, status }
  */
 
 import { createClient } from "@/lib/supabase/client";
@@ -37,6 +41,8 @@ export interface MarketingLead {
   nextFollowUp: string | null;
   notes: string | null;
   tags: string[];
+  accountNumber: string | null;
+  accountType: string | null;
   // For newsletter-only leads
   isNewsletterOnly: boolean;
   convertedToAccount: boolean;
@@ -54,28 +60,53 @@ export interface MarketingLeadStats {
   bySource: Record<LeadSource, number>;
 }
 
-// Raw types from Supabase
+// Raw types from Supabase (matching main site schema)
 interface ProfileRow {
   id: string;
   email: string;
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
+  account_type: string | null;
+  account_number: string | null;
   lead_source: string | null;
   interest_level: string | null;
-  nurturing_status: string | null;
   created_at: string;
   updated_at: string;
 }
 
+// Main site's client_selections schema (JSON items)
 interface SelectionRow {
-  profile_id: string;
-  quantity: number;
-  unit_price: number | null;
+  user_id: string;
+  items: SelectionItem[] | null;
+  labels: SelectionLabel[] | null;
+  updated_at: string;
 }
 
+interface SelectionItem {
+  id: string;
+  slug: string;
+  name: string;
+  price: number;
+  quantity: number;
+  category: string;
+  colour?: string;
+  notes?: string;
+}
+
+interface SelectionLabel {
+  id: string;
+  name: string;
+  color: string;
+}
+
+// Main site's selection_submissions schema
 interface SubmissionRow {
-  profile_id: string;
+  user_id: string;
+  items: SelectionItem[] | null;
+  total_items: number;
+  status: string;
+  created_at: string;
 }
 
 interface NewsletterRow {
@@ -104,7 +135,7 @@ export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
     // 1. Fetch all profiles
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, email, first_name, last_name, phone, lead_source, interest_level, nurturing_status, created_at, updated_at");
+      .select("id, email, first_name, last_name, phone, account_type, account_number, lead_source, interest_level, created_at, updated_at");
     
     if (profilesError) {
       console.error("Error fetching profiles:", profilesError);
@@ -112,18 +143,20 @@ export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
     }
 
     // 2. Fetch all submissions to exclude submitted clients
+    // Main site uses user_id, not profile_id
     const { data: submissions, error: submissionsError } = await supabase
       .from("selection_submissions")
-      .select("profile_id");
+      .select("user_id");
     
     if (submissionsError) {
       console.error("Error fetching submissions:", submissionsError);
     }
 
-    // 3. Fetch all selections for counts and values
+    // 3. Fetch all selections (JSON items format from main site)
+    // Main site uses user_id, not profile_id
     const { data: selections, error: selectionsError } = await supabase
       .from("client_selections")
-      .select("profile_id, quantity, unit_price");
+      .select("user_id, items, updated_at");
     
     if (selectionsError) {
       console.error("Error fetching selections:", selectionsError);
@@ -151,8 +184,16 @@ export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
     }
 
     // Create lookup maps
-    const submittedProfileIds = new Set((submissions || []).map((s: SubmissionRow) => s.profile_id));
-    const selectionsByProfile = groupBy(selections || [], (s: SelectionRow) => s.profile_id);
+    // Handle both user_id and profile_id for backwards compatibility
+    const submittedUserIds = new Set(
+      (submissions || []).map((s: any) => s.user_id || s.profile_id)
+    );
+    
+    const selectionsByUser = new Map<string, SelectionRow>();
+    (selections || []).forEach((s: SelectionRow) => {
+      selectionsByUser.set(s.user_id, s);
+    });
+    
     const latestOutreachByProfile = new Map<string, OutreachRow>();
     (outreachData || []).forEach((o: OutreachRow) => {
       if (!latestOutreachByProfile.has(o.client_id)) {
@@ -165,14 +206,19 @@ export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
 
     for (const profile of (profiles || []) as ProfileRow[]) {
       // Skip submitted clients - they go to Pipeline
-      if (submittedProfileIds.has(profile.id)) continue;
+      if (submittedUserIds.has(profile.id)) continue;
 
-      const profileSelections = selectionsByProfile.get(profile.id) || [];
-      const selectionCount = profileSelections.length;
-      const selectionValue = profileSelections.reduce(
-        (sum: number, s: SelectionRow) => sum + (s.unit_price || 0) * s.quantity,
+      // Get selection data (JSON format from main site)
+      const userSelection = selectionsByUser.get(profile.id);
+      const items = userSelection?.items || [];
+      
+      // Calculate counts and values from JSON items
+      const selectionCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+      const selectionValue = items.reduce(
+        (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
         0
       );
+      
       const latestOutreach = latestOutreachByProfile.get(profile.id);
 
       leads.push({
@@ -181,16 +227,18 @@ export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
         email: profile.email,
         phone: profile.phone,
         source: normalizeSource(profile.lead_source),
-        status: selectionCount > 0 ? "browsing" : "registered",
+        status: items.length > 0 ? "browsing" : "registered",
         interest: normalizeInterest(profile.interest_level),
         selectionCount,
         selectionValue,
         createdAt: profile.created_at,
-        lastActivityAt: profile.updated_at,
+        lastActivityAt: userSelection?.updated_at || profile.updated_at,
         lastOutreachAt: latestOutreach?.created_at || null,
         nextFollowUp: latestOutreach?.follow_up_date || null,
         notes: null,
         tags: [],
+        accountNumber: profile.account_number,
+        accountType: profile.account_type,
         isNewsletterOnly: false,
         convertedToAccount: true,
       });
@@ -214,6 +262,8 @@ export async function fetchMarketingLeads(): Promise<MarketingLead[]> {
         nextFollowUp: null,
         notes: null,
         tags: ["newsletter"],
+        accountNumber: null,
+        accountType: null,
         isNewsletterOnly: true,
         convertedToAccount: false,
       });
@@ -319,17 +369,6 @@ export async function getMarketingLeadStats(leads: MarketingLead[]): Promise<Mar
 }
 
 // Helper functions
-function groupBy<T>(array: T[], keyFn: (item: T) => string): Map<string, T[]> {
-  const map = new Map<string, T[]>();
-  for (const item of array) {
-    const key = keyFn(item);
-    const group = map.get(key) || [];
-    group.push(item);
-    map.set(key, group);
-  }
-  return map;
-}
-
 function normalizeSource(source: string | null): LeadSource {
   if (!source) return "website_signup";
   
@@ -354,5 +393,3 @@ function normalizeInterest(interest: string | null): InterestLevel {
   }
   return "warm"; // Default
 }
-
-

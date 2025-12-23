@@ -3,6 +3,11 @@
  * 
  * Handles data fetching for the Client Pipeline page (sales view)
  * Shows: only submitted clients going through sales process
+ * 
+ * SCHEMA NOTE: Main site uses:
+ * - selection_submissions: { user_id, items (JSON), total_items, status, filename }
+ * - client_selections: { user_id, items (JSON), labels (JSON) }
+ * - profiles: { id, email, first_name, last_name, phone, account_number, account_type }
  */
 
 import { createClient } from "@/lib/supabase/client";
@@ -30,6 +35,7 @@ export interface PipelineClient {
   stage: PipelineStage;
   priority: Priority;
   source: string;
+  accountNumber: string | null;
   
   // Selection data
   selectionCount: number;
@@ -58,6 +64,7 @@ export interface PipelineClient {
   
   // Notes
   notes: string | null;
+  filename: string | null;
 }
 
 export interface PipelineStats {
@@ -68,22 +75,16 @@ export interface PipelineStats {
   byStage: Record<PipelineStage, number>;
 }
 
-// Raw types from Supabase
-interface PipelineRow {
+// Types from main site schema
+interface SelectionItem {
   id: string;
-  client_id: string;
-  stage: string;
-  priority: string | null;
-  estimated_value: number | null;
-  last_activity_at: string;
-  next_follow_up: string | null;
-  meeting_date: string | null;
-  last_contacted_at: string | null;
-  quote_id: string | null;
-  order_id: string | null;
-  assigned_to: string | null;
-  source: string | null;
-  created_at: string;
+  slug: string;
+  name: string;
+  price: number;
+  quantity: number;
+  category: string;
+  colour?: string;
+  notes?: string;
 }
 
 interface ProfileRow {
@@ -92,22 +93,37 @@ interface ProfileRow {
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
+  account_number: string | null;
+  account_type: string | null;
 }
 
+// Main site's selection_submissions schema
 interface SubmissionRow {
   id: string;
-  profile_id: string;
-  submission_number: string;
+  user_id: string;
+  items: SelectionItem[] | null;
+  labels?: any[];
   total_items: number;
-  estimated_value: number | null;
-  submitted_at: string;
-  notes: string | null;
+  total_rooms?: number;
+  filename: string | null;
+  status: string;
+  created_at: string;
 }
 
-interface SelectionRow {
-  profile_id: string;
-  quantity: number;
-  unit_price: number | null;
+// Pipeline tracking (may or may not exist)
+interface PipelineRow {
+  id: string;
+  client_id: string;
+  stage: string;
+  priority: string | null;
+  estimated_value: number | null;
+  meeting_date: string | null;
+  last_contacted_at: string | null;
+  quote_id: string | null;
+  order_id: string | null;
+  assigned_to: string | null;
+  source: string | null;
+  created_at: string;
 }
 
 interface PaymentRow {
@@ -134,66 +150,57 @@ export async function fetchPipelineClients(): Promise<PipelineClient[]> {
   const supabase = createClient();
   
   try {
-    // 1. Fetch pipeline entries (these are clients with submissions)
-    const { data: pipelineData, error: pipelineError } = await supabase
-      .from("client_pipeline")
+    // 1. Fetch all submissions (this is the source of truth)
+    // Main site uses user_id, not profile_id
+    const { data: submissions, error: submissionsError } = await supabase
+      .from("selection_submissions")
       .select("*")
       .order("created_at", { ascending: false });
     
-    if (pipelineError) {
-      console.error("Error fetching pipeline:", pipelineError);
+    if (submissionsError) {
+      console.error("Error fetching submissions:", submissionsError);
       return [];
     }
 
-    if (!pipelineData || pipelineData.length === 0) {
+    if (!submissions || submissions.length === 0) {
       return [];
     }
 
-    // 2. Get all client IDs from pipeline
-    const clientIds = pipelineData.map((p: PipelineRow) => p.client_id);
+    // 2. Get all user IDs from submissions
+    const userIds = submissions.map((s: SubmissionRow) => s.user_id);
 
-    // 3. Fetch profiles for these clients
+    // 3. Fetch profiles for these users
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, email, first_name, last_name, phone")
-      .in("id", clientIds);
+      .select("id, email, first_name, last_name, phone, account_number, account_type")
+      .in("id", userIds);
     
     if (profilesError) {
       console.error("Error fetching profiles:", profilesError);
     }
 
-    // 4. Fetch submissions
-    const { data: submissions, error: submissionsError } = await supabase
-      .from("selection_submissions")
+    // 4. Try to fetch pipeline entries (may not exist yet)
+    const { data: pipelineData, error: pipelineError } = await supabase
+      .from("client_pipeline")
       .select("*")
-      .in("profile_id", clientIds);
+      .in("client_id", userIds);
     
-    if (submissionsError) {
-      console.error("Error fetching submissions:", submissionsError);
+    if (pipelineError) {
+      console.error("Error fetching pipeline (may not exist):", pipelineError);
     }
 
-    // 5. Fetch selections for counts/values
-    const { data: selections, error: selectionsError } = await supabase
-      .from("client_selections")
-      .select("profile_id, quantity, unit_price")
-      .in("profile_id", clientIds);
-    
-    if (selectionsError) {
-      console.error("Error fetching selections:", selectionsError);
-    }
-
-    // 6. Fetch payments
+    // 5. Fetch payments
     const { data: payments, error: paymentsError } = await supabase
       .from("client_payments")
       .select("client_id, payment_type, amount, status")
-      .in("client_id", clientIds)
+      .in("client_id", userIds)
       .eq("status", "paid");
     
     if (paymentsError) {
       console.error("Error fetching payments:", paymentsError);
     }
 
-    // 7. Fetch admin users for assignment names
+    // 6. Fetch admin users for assignment names
     const { data: adminUsers, error: adminError } = await supabase
       .from("admin_users")
       .select("id, name");
@@ -202,17 +209,17 @@ export async function fetchPipelineClients(): Promise<PipelineClient[]> {
       console.error("Error fetching admin users:", adminError);
     }
 
-    // 8. Fetch quotes for values
-    const quoteIds = pipelineData
+    // 7. Fetch quotes
+    const pipelineQuoteIds = (pipelineData || [])
       .map((p: PipelineRow) => p.quote_id)
       .filter(Boolean) as string[];
     
     let quotes: QuoteRow[] = [];
-    if (quoteIds.length > 0) {
+    if (pipelineQuoteIds.length > 0) {
       const { data: quotesData, error: quotesError } = await supabase
         .from("quotes")
         .select("id, total_amount")
-        .in("id", quoteIds);
+        .in("id", pipelineQuoteIds);
       
       if (!quotesError && quotesData) {
         quotes = quotesData;
@@ -221,28 +228,34 @@ export async function fetchPipelineClients(): Promise<PipelineClient[]> {
 
     // Create lookup maps
     const profileMap = new Map((profiles || []).map((p: ProfileRow) => [p.id, p]));
-    const submissionMap = new Map((submissions || []).map((s: SubmissionRow) => [s.profile_id, s]));
+    const pipelineMap = new Map((pipelineData || []).map((p: PipelineRow) => [p.client_id, p]));
     const adminMap = new Map((adminUsers || []).map((a: AdminUserRow) => [a.id, a.name]));
     const quoteMap = new Map(quotes.map((q: QuoteRow) => [q.id, q.total_amount]));
     
-    // Group selections and payments by profile
-    const selectionsByProfile = groupBy(selections || [], (s: SelectionRow) => s.profile_id);
-    const paymentsByProfile = groupBy(payments || [], (p: PaymentRow) => p.client_id);
+    // Group payments by user
+    const paymentsByUser = new Map<string, PaymentRow[]>();
+    (payments || []).forEach((p: PaymentRow) => {
+      const existing = paymentsByUser.get(p.client_id) || [];
+      existing.push(p);
+      paymentsByUser.set(p.client_id, existing);
+    });
 
-    // Build pipeline clients
+    // Build pipeline clients from submissions
     const clients: PipelineClient[] = [];
 
-    for (const pipeline of pipelineData as PipelineRow[]) {
-      const profile = profileMap.get(pipeline.client_id);
+    for (const submission of submissions as SubmissionRow[]) {
+      const profile = profileMap.get(submission.user_id);
       if (!profile) continue;
 
-      const submission = submissionMap.get(pipeline.client_id);
-      const profileSelections = selectionsByProfile.get(pipeline.client_id) || [];
-      const profilePayments = paymentsByProfile.get(pipeline.client_id) || [];
+      // Get pipeline tracking data if it exists
+      const pipeline = pipelineMap.get(submission.user_id);
+      const userPayments = paymentsByUser.get(submission.user_id) || [];
 
-      // Calculate selection value
-      const selectionValue = profileSelections.reduce(
-        (sum: number, s: SelectionRow) => sum + (s.unit_price || 0) * s.quantity,
+      // Calculate selection value from items JSON
+      const items = submission.items || [];
+      const selectionCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+      const selectionValue = items.reduce(
+        (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
         0
       );
 
@@ -251,41 +264,51 @@ export async function fetchPipelineClients(): Promise<PipelineClient[]> {
       let productionPaid = 0;
       let finalPaid = 0;
 
-      for (const payment of profilePayments) {
+      for (const payment of userPayments) {
         if (payment.payment_type === "deposit") depositPaid += payment.amount;
         else if (payment.payment_type === "production") productionPaid += payment.amount;
         else if (payment.payment_type === "delivery") finalPaid += payment.amount;
       }
 
       const totalPaid = depositPaid + productionPaid + finalPaid;
-      const quoteValue = pipeline.quote_id ? quoteMap.get(pipeline.quote_id) : null;
+      const quoteValue = pipeline?.quote_id ? quoteMap.get(pipeline.quote_id) : null;
       const totalDue = (quoteValue || selectionValue) - totalPaid;
 
+      // Determine stage from pipeline or submission status
+      let stage: PipelineStage = "submitted";
+      if (pipeline?.stage) {
+        stage = normalizeStage(pipeline.stage);
+      } else if (submission.status === "confirmed") {
+        stage = "deposit_paid";
+      }
+
       clients.push({
-        id: pipeline.id,
-        profileId: pipeline.client_id,
+        id: pipeline?.id || submission.id,
+        profileId: submission.user_id,
         name: [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email.split("@")[0],
         email: profile.email,
         phone: profile.phone,
-        stage: normalizeStage(pipeline.stage),
-        priority: normalizePriority(pipeline.priority),
-        source: pipeline.source || "website_signup",
-        selectionCount: profileSelections.length,
+        stage,
+        priority: normalizePriority(pipeline?.priority),
+        source: pipeline?.source || "website_signup",
+        accountNumber: profile.account_number,
+        selectionCount,
         selectionValue,
-        submittedAt: submission?.submitted_at || pipeline.created_at,
-        lastContactedAt: pipeline.last_contacted_at,
-        meetingDate: pipeline.meeting_date,
-        quoteId: pipeline.quote_id,
+        submittedAt: submission.created_at,
+        lastContactedAt: pipeline?.last_contacted_at || null,
+        meetingDate: pipeline?.meeting_date || null,
+        quoteId: pipeline?.quote_id || null,
         quoteValue: quoteValue || null,
-        orderId: pipeline.order_id,
+        orderId: pipeline?.order_id || null,
         depositPaid: depositPaid || null,
         productionPaid: productionPaid || null,
         finalPaid: finalPaid || null,
         totalPaid,
         totalDue,
-        assignedTo: pipeline.assigned_to,
-        assignedToName: pipeline.assigned_to ? adminMap.get(pipeline.assigned_to) || null : null,
-        notes: submission?.notes || null,
+        assignedTo: pipeline?.assigned_to || null,
+        assignedToName: pipeline?.assigned_to ? adminMap.get(pipeline.assigned_to) || null : null,
+        notes: null,
+        filename: submission.filename,
       });
     }
 
@@ -298,14 +321,17 @@ export async function fetchPipelineClients(): Promise<PipelineClient[]> {
 
 /**
  * Update pipeline stage
+ * Creates pipeline entry if it doesn't exist
  */
 export async function updatePipelineStage(
   pipelineId: string,
-  newStage: PipelineStage
+  newStage: PipelineStage,
+  clientId?: string
 ): Promise<boolean> {
   const supabase = createClient();
   
-  const { error } = await (supabase as any)
+  // Try to update existing pipeline entry
+  const { error: updateError } = await (supabase as any)
     .from("client_pipeline")
     .update({ 
       stage: newStage,
@@ -313,7 +339,21 @@ export async function updatePipelineStage(
     })
     .eq("id", pipelineId);
   
-  return !error;
+  // If update failed and we have a clientId, try to create the entry
+  if (updateError && clientId) {
+    const { error: insertError } = await (supabase as any)
+      .from("client_pipeline")
+      .insert({
+        client_id: clientId,
+        stage: newStage,
+        priority: "normal",
+        source: "website_signup",
+      });
+    
+    return !insertError;
+  }
+  
+  return !updateError;
 }
 
 /**
@@ -382,9 +422,6 @@ export function getPipelineStats(clients: PipelineClient[]): PipelineStats {
     },
   };
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
   for (const client of clients) {
     // Count by stage
     stats.byStage[client.stage]++;
@@ -400,7 +437,7 @@ export function getPipelineStats(clients: PipelineClient[]): PipelineStats {
       stats.totalPipelineValue += client.quoteValue || client.selectionValue;
     }
 
-    // Completed this month (rough check)
+    // Completed this month
     if (client.stage === "completed") {
       stats.completedThisMonth++;
     }
@@ -410,17 +447,6 @@ export function getPipelineStats(clients: PipelineClient[]): PipelineStats {
 }
 
 // Helper functions
-function groupBy<T>(array: T[], keyFn: (item: T) => string): Map<string, T[]> {
-  const map = new Map<string, T[]>();
-  for (const item of array) {
-    const key = keyFn(item);
-    const group = map.get(key) || [];
-    group.push(item);
-    map.set(key, group);
-  }
-  return map;
-}
-
 function normalizeStage(stage: string | null): PipelineStage {
   const validStages: PipelineStage[] = [
     "submitted", "contacted", "meeting_scheduled", "quoted",
@@ -434,11 +460,9 @@ function normalizeStage(stage: string | null): PipelineStage {
   return "submitted";
 }
 
-function normalizePriority(priority: string | null): Priority {
+function normalizePriority(priority: string | null | undefined): Priority {
   if (priority === "normal" || priority === "high" || priority === "urgent") {
     return priority;
   }
   return "normal";
 }
-
-
